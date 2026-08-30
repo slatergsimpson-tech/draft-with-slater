@@ -392,14 +392,23 @@ Drafting on your own needs **no relay and no computer running** — the app is
 one file and the cards come from Scryfall. It only needs to live at an address
 your phone can open. GitHub Pages is the sturdiest free way to do that:
 
-1. Make a repository on [github.com](https://github.com) — call it `draft`.
-   Public is fine; there is nothing secret here.
-2. Upload `index.html` to it. If you want the sharper card ratings on your
-   phone too, upload the `ratings` folder alongside it.
-3. In the repo: **Settings → Pages → Build and deployment**, set *Source* to
+This project already lives at
+[github.com/slatergsimpson-tech/draft-with-slater](https://github.com/slatergsimpson-tech/draft-with-slater),
+so only one step is left:
+
+1. In the repo: **Settings → Pages → Build and deployment**, set *Source* to
    **Deploy from a branch**, branch `main`, folder `/ (root)`. Save.
-4. Wait a minute. The page appears at `https://<your-name>.github.io/draft/`.
-5. Open that on the phone, then **Share → Add to Home Screen**.
+2. Wait a minute. The app appears at
+   **https://slatergsimpson-tech.github.io/draft-with-slater/**
+3. Open that on the phone, then **Share → Add to Home Screen**.
+
+`index.html` sits at the repository root and the `ratings` folder travels with
+it, so the phone gets the win-rate-trained bots too. Nothing else needs
+configuring — there is no build step.
+
+Starting from scratch elsewhere, the same three ideas apply: any repository
+with `index.html` at its root, Pages pointed at that branch, and the address it
+gives you.
 
 That address never changes, costs nothing, and is up whether or not your
 computer is. Every set, every cube, Winston against the bot, sealed, the deck
