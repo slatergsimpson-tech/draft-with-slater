@@ -416,13 +416,55 @@ builder and the playtester all work there. Drag-and-drop hosts like
 **Cloudflare Pages** or **Netlify** work the same way if you prefer them to
 GitHub.
 
-**What will not work there is drafting with other people**, because that needs
-the relay — a program someone has to be running. The app checks which kind of
-address it is on and says so plainly in the *Draft with friends* panel, rather
-than pretending and leaving you waiting. When you do want a table, start the
-launcher at home, or put the relay on a free host as described above.
+To update the app later, push to the repository — Pages redeploys itself.
 
-To update the app later, upload the new `index.html` over the old one.
+### Making the address shorter
+
+`…github.io/draft-with-slater/` works but is a mouthful. Three ways to improve
+it, cheapest first:
+
+- **Rename the repository** to `draft` (Settings → General → Repository name).
+  You get `slatergsimpson-tech.github.io/draft/`, and GitHub redirects the old
+  address so nothing breaks. Update the remote afterwards with
+  `git remote set-url origin https://github.com/slatergsimpson-tech/draft.git`.
+- **A user site.** A repository named exactly `slatergsimpson-tech.github.io`
+  is served at `https://slatergsimpson-tech.github.io/` — no path at all. That
+  is the shortest free address there is; the cost is that it uses up the one
+  user site your account gets.
+- **A domain you own.** `myskycoach.com` is yours, so a `CNAME` record for
+  `draft.myskycoach.com` pointing at `slatergsimpson-tech.github.io`, plus that
+  name entered under Settings → Pages → Custom domain, gives you
+  **draft.myskycoach.com**. GitHub issues the certificate. This is the one to
+  send people.
+
+### Which address do I use for what?
+
+Two different jobs, and it is worth being clear about which is which:
+
+| | Pages address | Relay address |
+|---|---|---|
+| Draft on your own | **yes** — nothing else needed | yes |
+| Draft with friends | only with a `wss://` relay, see below | **yes** |
+| Computer must be on | no | yes |
+
+**Drafting alone: use the Pages address.** That is the whole point of it.
+
+**Drafting together: easiest is the relay's own address**, exactly as before —
+the `http://192.168.…:8787` the launcher prints, or a tunnel address. The app
+and the relay come from the same place and everything fills itself in.
+
+You *can* also draft together from the Pages address, by pasting a relay into
+the **Relay address** box: the invite link it then gives you carries that relay
+inside it, so guests are pointed at the right place automatically. One rule
+governs whether this works. The Pages address is `https://`, and **a secure
+page is not allowed to open an insecure `ws://` socket** — the browser blocks
+it before the relay hears anything. So:
+
+- Pages + `wss://…` (a tunnel, or a relay on Render) — **works**
+- Pages + `ws://192.168.…` (the relay at home) — **blocked by the browser**
+
+The app now says so when you type such an address, rather than letting you
+wait on a connection that was never attempted.
 
 ## Sharper card ratings (optional, once per set)
 

@@ -5869,6 +5869,13 @@ function mpConnect(room, asHost, onReady){
       'wss://your-relay.onrender.com, or localhost:8787 if you are running it here.', true);
     return null;
   }
+  if (mixedContentRelay(url)) {
+    mpStatus('This page was loaded over https, and a secure page is not allowed to open ' +
+      'an insecure ws:// connection — the browser blocks it before the relay ever hears ' +
+      'from us. Use a wss:// relay (a tunnel, or one on a host), or open the app from ' +
+      'the relay\'s own address instead of this one.', true);
+    return null;
+  }
   mpStatus('Connecting to the relay…');
   var conn = N.connect({ url: url, room: room, name: mpName() });
   MP.conn = conn;
@@ -6402,8 +6409,21 @@ $('btnLobbyStart').onclick = function(){
   else if (S.source === 'cube') $('btnCubeStart').click();
   else $('btnStart').click();
 };
+/* A secure page may not open an insecure socket. The browser blocks it
+ * silently, which looks exactly like a relay that will not answer — and
+ * hosting the app somewhere with https and pointing it at the relay running
+ * at home is the most natural thing in the world to try. */
+function mixedContentRelay(url){
+  return location.protocol === 'https:' && /^ws:\/\//i.test(String(url || ''));
+}
+
 $('mpRelay').oninput = function(){
   var u = mpRelayUrl();
+  if (u && mixedContentRelay(u)) {
+    $('mpRelayNote').textContent = 'This page is secure (https), so the browser will refuse ' +
+      'a ws:// relay. Use a wss:// address — a tunnel, or a relay on a host.';
+    return;
+  }
   $('mpRelayNote').textContent = u ? 'Will connect to ' + u : '';
 };
 
