@@ -1,0 +1,10 @@
+# Agent and editor scratch — local tooling config, not part of the app.
+.claude/
+
+# Nothing here needs installing, but just in case.
+node_modules/
+
+# OS litter
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,28 @@
+# Putting the relay somewhere that is always up, so nothing has to run at home.
+#
+# Render reads this file when you point it at the repository (New → Blueprint),
+# so there is nothing to configure by hand. The relay has no dependencies and
+# no build step: Render clones the repo and runs one Node file.
+#
+# The free plan sleeps the service after fifteen minutes with no traffic and
+# takes about a minute to wake. The app knows this and keeps knocking for
+# ninety seconds rather than reporting a failure, so the first person to open
+# the link on draft night waits, and nobody after that does.
+#
+# HOST is deliberately not set: Render routes to the port it hands you, and the
+# server already listens on every interface by default.
+services:
+  - type: web
+    name: draft-relay
+    runtime: node
+    plan: free
+    # No dependencies on purpose, so there is nothing to install.
+    buildCommand: ""
+    startCommand: node server/server.js
+    healthCheckPath: /health
+    envVars:
+      # Set this to 1 if you would rather open tables were not listed to
+      # anyone who finds the address. Rooms still work; they just are not
+      # advertised, so a guest needs the invite link or the four-character code.
+      - key: PRIVATE
+        value: "0"
