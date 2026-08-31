@@ -551,8 +551,10 @@
     .row > *{width:100%}
     .statusbar,.ptbar{padding:9px 11px; gap:7px; position:static}
     .setlist{max-height:46vh}
-    .packgrid{grid-template-columns:repeat(auto-fill,minmax(min(30vw,var(--card-w)),1fr)); gap:8px}
-    .minigrid{grid-template-columns:repeat(auto-fill,minmax(min(28vw,var(--card-w-sm)),1fr)); gap:7px}
+    /* Caps generous enough that the top two size steps still differ; at 30vw
+       everything from L upwards collapsed to the same width. */
+    .packgrid{grid-template-columns:repeat(auto-fill,minmax(min(60vw,var(--card-w)),1fr)); gap:8px}
+    .minigrid{grid-template-columns:repeat(auto-fill,minmax(min(40vw,var(--card-w-sm)),1fr)); gap:7px}
     .sidebar{position:static; max-height:none; margin-top:14px}
     #rulesPanel,#libPanel{width:100%; border-left:none}
     .ptfield{padding:10px}
@@ -576,8 +578,16 @@
   @media(max-width:420px){
     /* Three across: with hold-to-read there is no need for a card to be big
        enough to read at a glance. */
-    .packgrid{grid-template-columns:repeat(3,1fr); gap:6px}
-    .minigrid{grid-template-columns:repeat(4,1fr); gap:5px}
+    /* Literal card widths rather than stretched columns.
+       A fixed column count ignored the size control entirely — tapping Larger
+       changed the variable and nothing moved. Stretching to 1fr fixed that
+       but only in steps of a whole column, so half the taps still appeared to
+       do nothing. Here the track *is* the chosen width, so every step of the
+       control is visible; the row is centred, which reads as deliberate. */
+    .packgrid{grid-template-columns:repeat(auto-fill,min(92vw,var(--card-w)));
+              justify-content:center; gap:6px}
+    .minigrid{grid-template-columns:repeat(auto-fill,min(46vw,var(--card-w-sm)));
+              justify-content:center; gap:5px}
     header h1{font-size:15px}
   }
   /* Long button labels cost a whole header row on a phone. */
@@ -844,12 +854,10 @@
     </div>
   </div>
     <div class="card-panel" id="setupPanel">
+      <!-- Just the greeting. The lines that used to sit under it are better
+           met while a set is loading, where you are waiting anyway. -->
       <div class="greet" id="greeting">
         <h2 id="greetHead">Welcome.</h2>
-        <p id="greetBody"></p>
-        <div class="gmore">
-          <button class="btn sm" id="btnGreetAgain">Shuffle that</button>
-        </div>
       </div>
       <!-- Drafting with other people. Orthogonal to where the packs come
            from, so it sits above the source tabs rather than beside them. -->
@@ -1167,11 +1175,13 @@
       <span id="stClock" class="pill hidden" aria-live="off">⏱ <b id="stClockN">45</b></span>
       <span id="stTable" class="pill hidden" title="Who is still to pick"></span>
       <span class="spacer"></span>
-      <button class="btn sm" id="btnToggleDeck" aria-expanded="false" aria-controls="zonePanel">Show my deck</button>
+      <button class="btn sm" id="btnToggleDeck" aria-expanded="true" aria-controls="zonePanel">Hide my deck</button>
       <span id="packNote" class="pill" style="color:var(--ink3)"></span>
     </div>
     <div id="draftNote" class="note hidden"></div>
-    <div class="draftgrid" id="draftGrid">
+    <!-- The deck panel starts open: what you have already taken is the thing
+         you most want to see while deciding what to take next. -->
+    <div class="draftgrid panel-open" id="draftGrid">
       <div>
         <div class="packgrid" id="packGrid"></div>
       </div>
@@ -1186,7 +1196,7 @@
           <div id="chaosSheetBody"></div>
         </details>
         <div id="draftColourSlot"></div>
-        <div id="draftPanelSlot" class="hidden" style="margin-top:16px"></div>
+        <div id="draftPanelSlot" style="margin-top:16px"></div>
       </aside>
     </div>
   </section>
@@ -4809,7 +4819,7 @@ function comboLabel(cols){
   return (COMBO_NAME[key] || key) + ' (' + key + ')';
 }
 
-S.themeColors = ['U', 'R', 'G'];
+S.themeColors = ['W', 'B', 'G'];   // Abzan — white, gold-ish and green
 S.mode = 'dark';
 
 function themeInk(c){ return MTG_INK[c] ? MTG_INK[c][S.mode] : MTG_INK.C[S.mode]; }
@@ -4984,30 +4994,9 @@ $('cardBigger').onclick  = function(){ stepCard(1); };
 
 /* ---------------- the greeting ----------------
  *
- * A welcome in the spirit of the mathematician who invented the game between
- * lectures: fond of randomness, suspicious of certainty, more interested in
- * the decision than the card. These are written for this tool — no words are
- * put in any real person's mouth. */
-var GREETINGS = [
-  'A booster pack is a random sample of a world. The interesting part is that you are allowed to disagree with it.',
-  'Somewhere in the packs you are about to open is a card nobody has first-picked in twenty years. It is probably still bad. Take it anyway once.',
-  'Eight players, forty-five decisions, and at the end a deck that has never existed before and will never exist again. That is the whole trick.',
-  'The best card in the pack and the best card for your deck are rarely the same card. Everything worth learning lives in that gap.',
-  'Seventeen lands is a hypothesis, not a law. But it is a very good hypothesis.',
-  'Every game you have ever played was decided by a shuffle you did not watch. This has not stopped anybody yet.',
-  'A draft is an argument with seven other people conducted entirely through what you decline to take.',
-  'Rare does not mean good. It means rare. The set designers were quite clear about this and nobody listens.',
-  'The deck you build is a theory. The games are the experiment. Most theories are wrong, which is the fun of it.',
-  'Two mana, two power, and a relevant ability will beat something magnificent and expensive more often than feels fair.',
-  'Old sets are not worse. They are stranger. Strange is more fun to solve.',
-  'You cannot draft the deck you want. You can only draft the deck the table lets you have, gracefully.',
-  'The pack does not know what you are doing. That is what makes it honest.',
-  'Every format is a puzzle that eight people are solving at once, badly, in real time. Join in.',
-  'If a card is still in the pack on pick nine, that is eight people telling you something. Listen to them.',
-  'Play the games out. A deck that looks right on paper and loses to itself in goldfishing is not right.',
-  'There is no such thing as a bad rare, only a rare that belongs in someone else\'s deck.',
-  'The curve is more important than the bombs. It is also less exciting, which is why people ignore it.'
-];
+ * The time of day and an invitation, and nothing else. The lines that used
+ * to sit under this are now met while a set is loading, where you are
+ * waiting anyway and a sentence is a kindness rather than furniture. */
 function timeWord(){
   var h = new Date().getHours();
   if (h < 5) return 'Still up';
@@ -5015,18 +5004,9 @@ function timeWord(){
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
 }
-var greetIdx = -1;
-function renderGreeting(shuffle){
-  var next = Math.floor(Math.random() * GREETINGS.length);
-  // Never show the same line twice in a row when re-rolling.
-  if (shuffle && GREETINGS.length > 1) {
-    while (next === greetIdx) next = Math.floor(Math.random() * GREETINGS.length);
-  }
-  greetIdx = next;
-  $('greetHead').textContent = timeWord() + '. Let\'s open something.';
-  $('greetBody').textContent = GREETINGS[greetIdx];
+function renderGreeting(){
+  $('greetHead').textContent = timeWord() + ". Let's open something.";
 }
-$('btnGreetAgain').onclick = function(){ renderGreeting(true); announce('New greeting'); };
 
 /* ---------------- loading flavour ----------------
  *
@@ -5035,6 +5015,7 @@ $('btnGreetAgain').onclick = function(){ renderGreeting(true); announce('New gre
  * switch to a real flavour text from that set, which is a much better welcome
  * to the environment you are about to draft. */
 var LOAD_LINES = [
+  // Things the app is plausibly doing.
   'Shuffling something that has not been shuffled since the nineties.',
   'Sorting commons into piles nobody asked for.',
   'Arguing with seven robots about what colour they are.',
@@ -5043,12 +5024,33 @@ var LOAD_LINES = [
   'Consulting the rare sheet. The rare sheet is not returning calls.',
   'Laying out lands in the middle of the table for anyone who needs them.',
   'Checking that the foil is where the foil should be.',
-  'Somewhere in here is the card that decides the whole draft.',
   'Teaching the bots that seventeen lands is usually correct.',
   'Reticulating splines. Sorry — collating boosters.',
   'Waking up the printing press of 1994.',
-  'Every card in this set was once somebody\'s favourite card.',
-  'Putting the basic lands back. You can always have more.'
+  'Putting the basic lands back. You can always have more.',
+  'Thirty years of other people’s imagination, catalogued and waiting.',
+  'Looking for the card somebody at this table will remember for years.',
+
+  // Things worth knowing, offered rather than insisted upon.
+  'Every card in this set was once somebody’s favourite card.',
+  'Somebody is playing their first game of Magic right now, and somebody else their ten-thousandth. Both of them are doing it right.',
+  'Old sets are not worse. They are stranger, and strange is more fun to solve.',
+  'A booster pack is a random sample of a world, and you are allowed to disagree with it.',
+  'The best card in the pack and the best card for your deck are rarely the same card. Everything worth learning lives in that gap.',
+  'Seventeen lands is a hypothesis, not a law. It is a very good hypothesis.',
+  'The deck you build is a theory, the games are the experiment, and most theories are wrong. That is the fun of it.',
+  'Every format is a puzzle eight people are solving at once, badly, in real time. Come and join in.',
+  'You rarely draft the deck you wanted. You draft the one the table offered you, and that one is usually more interesting.',
+  'There is no such thing as a bad rare — only a rare that belongs in somebody else’s deck.',
+  'If a card is still there on pick nine, seven people have told you something. It is worth listening.',
+  'Nobody drafts the same way twice. That is the reason anybody is still here after thirty years.',
+  'Being wrong about a card for an entire evening is one of the quieter pleasures of this game.',
+  'Somewhere in here is a card nobody has first-picked in twenty years. It is probably still bad. Take it once anyway.',
+  'A draft is a conversation with seven other people, conducted entirely through what you decline to take.',
+  'The pack does not know what you are doing, which is what makes it honest.',
+  'Rare has never meant good. It is only remarkably good at looking like it.',
+  'Every set here was somebody’s first one. Be gentle with the old ones.',
+  'Nobody has finished solving any format. You are not late.'
 ];
 var flavourTimer = null;
 function setFlavour(text, source){
@@ -9192,12 +9194,14 @@ document.addEventListener('keydown', function(e){
   if (e.key === 'Escape' && !$('storyOver').classList.contains('hidden')) closeStory();
 });
 
-/* Same set, same cards — fresh packs. No round trip to Scryfall. */
-function closeDeckPanel(){
-  $('draftPanelSlot').classList.add('hidden');
-  $('draftGrid').classList.remove('panel-open');
-  $('btnToggleDeck').textContent = 'Show my deck';
-  $('btnToggleDeck').setAttribute('aria-expanded', 'false');
+/* Put the deck panel back to how a draft starts: open, showing the main
+ * deck. Called when a new draft begins, so a zone you were rummaging in
+ * last time does not carry over into the next one. */
+function resetDeckPanel(){
+  $('draftPanelSlot').classList.remove('hidden');
+  $('draftGrid').classList.add('panel-open');
+  $('btnToggleDeck').textContent = 'Hide my deck';
+  $('btnToggleDeck').setAttribute('aria-expanded', 'true');
   S.zone = 'deck';
   Array.prototype.forEach.call($('zoneTabs').children, function(x){
     var on = x.dataset.zone === 'deck';
@@ -9207,13 +9211,13 @@ function closeDeckPanel(){
 }
 
 $('btnRedraft').onclick = function(){
-  closeDeckPanel();
+  resetDeckPanel();
   S.draft = null; S.pool = []; S.deck = []; S.commander = null;
   startPlay(Math.floor(Math.random()*1e9));
 };
 
 $('btnRestart').onclick = function(){
-  closeDeckPanel();
+  resetDeckPanel();
   S.draft = null; S.pool = []; S.deck = []; S.chosen = null; S.cards = []; S.commander = null;
   S.chaosRounds = null; S.artHintCode = null;
   clearAmbient();
