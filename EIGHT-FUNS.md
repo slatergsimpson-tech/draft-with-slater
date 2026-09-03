@@ -192,6 +192,31 @@ remembers the table's usual settings, greets returning names, maybe a
   Still open in this phase: pack-opening ritual, the pass, pick travel,
   rarity-as-light, optional sound.
 
+- [x] Sensation / Expression: **the mana base as a souvenir** — 2026-09-03.
+  Basic land art was already drawn from the deck's own sets; three things
+  were wrong with it and all three are fixed. **A set with no basics used to
+  vanish** — the pool just quietly leaned on whatever else was in the deck.
+  It now borrows from the nearest set that shares its flavour, moving
+  outward and more macro: a sibling from its own block, then that era's core
+  set, then Alpha. Modern Masters gets Magic 2014, Conspiracy gets Take the
+  Crown, Antiquities gets Alpha. **Only one art per set was kept**; now every
+  printing is, so a modern set contributes four pictures rather than one and
+  a seventeen-land base measured in the browser comes out seventeen distinct
+  paintings instead of three. Arts are dealt round-robin across sets so the
+  first few Forests come from different worlds rather than all from the set
+  that happened to contribute most cards. And **reprints and special
+  treatments now lose to the original printing**: a picture in two of the
+  deck's sets is credited to the earlier one (Revised's Forests are Alpha's
+  Forests, measured — ten of fifteen), Unlimited/Revised/Fourth Edition are
+  barred from standing in for anyone automatically, and showcase, borderless
+  and promo frames are dropped wherever the set has a plain printing to use
+  instead. That last rule is *relative* on purpose: Unfinity's lands are all
+  marked as a special frame, and an absolute filter would have left the set
+  whose whole selling point is its lands with none. A partial set keeps what
+  it has — Arabian Nights' single Mountain still turns up in the deck, with
+  Alpha filling the other four — and the note under the menu says which sets
+  it used and why. Verdict at next draft night.
+
 - [x] Flow: **era first, then set** — 2026-08-14. The setup screen was one
   long configuration form; it now asks the question this app exists to ask.
   Step one is a shelf of six era cards, each with its years, a line about

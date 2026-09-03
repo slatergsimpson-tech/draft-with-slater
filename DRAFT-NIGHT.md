@@ -528,6 +528,21 @@ in boosters at all, so those packs are the app's invention, and it says so.
 Their full-art lands are in the **Basic land artwork** menu too, so you can put
 Unglued's lands in a Ravnica deck if you like.
 
+**Why are my basic lands all different pictures?** Because they can be. The
+default, *From the sets in your deck*, takes every printing of every basic
+from every set the deck is made of, so seventeen lands usually means
+seventeen different paintings — and in a chaos draft they come from all the
+worlds you drafted at once, dealt round-robin rather than in blocks. Three
+rules keep it honest. A set that prints no basics of its own borrows from the
+nearest set that shares its flavour: a sibling from its own block first, then
+that era's core set, then Alpha — so a Modern Masters deck gets Magic 2014's
+lands rather than whatever else happened to be in the pool. A picture printed
+in more than one of your sets is credited to the earliest of them, so Revised
+never stands in for Alpha's art. And showcase frames, borderless treatments
+and promos are skipped where the set has an ordinary printing to use instead,
+unless — like Unfinity — the special treatment is all the set has. The line
+under the menu says exactly which sets it used and why.
+
 **Where do I get a cube?** The cube tab opens on **Find a cube**. The official
 cubes — Vintage, Legacy, Modern, Arena and the rest of the ones Wizards runs —
 load in one click, and their lists come from Scryfall, so they are current

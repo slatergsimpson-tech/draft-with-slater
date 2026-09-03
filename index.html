@@ -9691,8 +9691,11 @@ $('btnRestart').onclick = function(){
 
 /* ---------------- basic land artwork ---------------- */
 /* Basics are stripped from booster pools, so we synthesise them and then dress
- * them in art. First choice is the set being drafted; sets with no basics of
- * their own fall back down a list of era-appropriate printings. */
+ * them in art. First choice is the set being drafted. A set that prints no
+ * basics of its own borrows from the nearest set that shares its flavour —
+ * a sibling from its own block, then its era's core set, then Alpha — rather
+ * than quietly leaving the job to whichever other set the deck happens to
+ * contain. */
 var ART_CHOICES = [
   { code: 'deck', name: 'From the sets in your deck (recommended)' },
   { code: 'auto', name: 'Match the set being drafted' },
@@ -9705,48 +9708,191 @@ var ART_CHOICES = [
   { code: 'ons',  name: 'Onslaught (2002)' },
   { code: 'chk',  name: 'Champions of Kamigawa (2004)' },
   { code: 'rav',  name: 'Ravnica (2005)' },
-  { code: 'zen',  name: 'Zendikar full-art (2009)' },
+  { code: 'zen',  name: 'Zendikar full-art (2009)', fullArt: true },
   // The silver-bordered sets put a full-art land in every pack, and they are
   // some of the best-loved art in the game.
-  { code: 'ugl',  name: 'Unglued full-art (1998)' },
-  { code: 'unh',  name: 'Unhinged full-art (2004)' },
-  { code: 'ust',  name: 'Unstable full-art (2017)' },
-  { code: 'und',  name: 'Unsanctioned full-art (2020)' },
-  { code: 'unf',  name: 'Unfinity full-art (2022)' }
+  { code: 'ugl',  name: 'Unglued full-art (1998)', fullArt: true },
+  { code: 'unh',  name: 'Unhinged full-art (2004)', fullArt: true },
+  { code: 'ust',  name: 'Unstable full-art (2017)', fullArt: true },
+  { code: 'und',  name: 'Unsanctioned full-art (2020)', fullArt: true },
+  { code: 'unf',  name: 'Unfinity full-art (2022)', fullArt: true }
 ];
-// Tried in order when the drafted set has no basics of its own.
-var ART_FALLBACK = ['3ed', 'ice', 'usg', 'inv', 'ons', 'lea'];
+// The menu items that promise full-art lands have to deliver full-art lands.
+var ART_FULL_ART = {};
+ART_CHOICES.forEach(function(o){ if (o.fullArt) ART_FULL_ART[o.code] = 1; });
+
+/* The last resort, when nothing about the deck's own sets leads anywhere.
+ * Alpha leads it: its art is the original printing of the ten basics that
+ * Unlimited, Revised and Fourth Edition went on to reprint between them. */
+var ART_FALLBACK = ['lea', '5ed', 'ice', 'usg', 'inv', 'ons'];
+
+/* Core sets whose basic art is somebody else's.
+ *
+ * Measured, not assumed: each of Unlimited, Revised and Fourth Edition
+ * carries fifteen basic arts, ten of which are Alpha's; from Fifth Edition
+ * on there is no overlap at all. So these never stand in for a set
+ * automatically — a substitution should reach for the original printing.
+ * They are still in the menu by name, because choosing Revised on purpose is
+ * a different thing from being handed it. */
+var REPRINT_EDITIONS = { leb: 1, '2ed': 1, '3ed': 1, '4ed': 1, fbb: 1, '4bb': 1, sum: 1 };
+
+// Set kinds a stand-in may be drawn from — a real release somebody drafted.
+var STAND_IN_TYPES = { core: 1, expansion: 1, masters: 1, draft_innovation: 1 };
+
+/* Treatments that are not the ordinary printing of a land. Applied only when
+ * the set has a plain printing to prefer instead: Unfinity's basics are
+ * *all* marked with a special frame, and dropping them on sight would leave
+ * Unfinity — a set whose whole selling point is its lands — with none. */
+var FANCY_FRAMES = {
+  showcase: 1, extendedart: 1, borderless: 1, etched: 1,
+  shatteredglass: 1, inverted: 1, companion: 1
+};
 
 var artCache = {};
 
+function setMeta(code){
+  code = String(code || '').toLowerCase();
+  var all = S.allSets || [];
+  for (var i = 0; i < all.length; i++) {
+    if (String(all[i].code || '').toLowerCase() === code) return all[i];
+  }
+  return null;
+}
+
+/* Where to borrow basics from when a set prints none of its own.
+ *
+ * Nearest in flavour first, then macro: a sibling from the same block (a
+ * masters set or a Conspiracy belongs with its own block before it belongs
+ * anywhere else), then the core set of the same era — the generic Magic of
+ * that moment, which is exactly the right register for a stand-in — and
+ * finally Alpha. Three candidates at most, deliberately: every miss is
+ * another round trip, and a chaos deck asks this question eight times. */
+function flavourChain(code){
+  var me = setMeta(code), picks = [];
+  if (me && me.released_at) {
+    var when = new Date(me.released_at);
+    var near = function(list){
+      return list.slice().sort(function(a, b){
+        var da = Math.abs(new Date(a.released_at) - when);
+        var db = Math.abs(new Date(b.released_at) - when);
+        // Ties go to the older set: the original printing, again.
+        return da - db || (a.released_at < b.released_at ? -1 : 1);
+      });
+    };
+    /* Sets that could sensibly stand in for another: real releases, not the
+     * promo, token and memorabilia sets Scryfall hangs off them. Skipping
+     * those matters twice over — a promo sheet's lands are exactly the
+     * "specialised printing" we are trying to avoid, and every candidate
+     * that turns out to have no basics costs a wasted request. */
+    var all = (S.allSets || []).filter(function(s){
+      return s && s.code && s.released_at && !s.digital &&
+        STAND_IN_TYPES[s.set_type] &&
+        String(s.code).toLowerCase() !== String(code || '').toLowerCase();
+    });
+    /* A sibling from the same block. Scryfall files every core set under a
+     * nominal "lea" block, which would make each of them everybody's
+     * sibling, so this step is for the real blocks only. */
+    if (me.block_code && me.set_type !== 'core') {
+      var sibs = near(all.filter(function(s){
+        return s.block_code === me.block_code && s.set_type !== 'core';
+      }));
+      if (sibs.length) picks.push(sibs[0].code);
+    }
+    var cores = near(all.filter(function(s){
+      return s.set_type === 'core' && !REPRINT_EDITIONS[String(s.code).toLowerCase()];
+    }));
+    if (cores.length) picks.push(cores[0].code);
+  }
+  picks.push('lea');
+
+  var seen = {}, chain = [];
+  picks.forEach(function(c){
+    c = String(c || '').toLowerCase();
+    if (!c || c === String(code || '').toLowerCase() || seen[c]) return;
+    seen[c] = 1;
+    chain.push(c);
+  });
+  return chain;
+}
+
+/* Every printing of a set's basics, grouped by land name.
+ *
+ * All of them, not one: a seventeen-land mana base made of seventeen
+ * different pictures is the whole point, and a modern set prints two
+ * ordinary arts and two full-art ones for each type. Specialised treatments
+ * are dropped where a plain printing exists — Core Set 2021's showcase
+ * Plains is a nice card and is not what an ordinary deck's lands look like. */
 async function fetchBasics(code){
-  if (artCache[code]) return artCache[code];
+  code = String(code || '').toLowerCase();
+  if (artCache[code] !== undefined) return artCache[code];
+  var out = null;
   try {
     var page = await api('/cards/search?q=' + encodeURIComponent('t:basic -t:snow e:' + code) +
       '&unique=art&order=name');
-    if (!page || !page.data || !page.data.length) return null;
-    /* Prefer the full-art printing when a set has both.
-     *
-     * Zendikar is the case that matters: Scryfall carries twenty ZEN basics,
-     * ten full-art and ten not, and ordering by name puts the ordinary ones
-     * first — so asking for "Zendikar full-art" quietly handed back ordinary
-     * Zendikar basics. Sets with only one kind are unaffected, because there
-     * is nothing better to find. */
-    var out = {}, isFull = {};
-    page.data.forEach(function(c){
-      var nm = (c.name || '').replace(/^Snow-Covered /, '');
-      if (!c.image_uris) return;
-      if (out[nm] && !(c.full_art && !isFull[nm])) return;
-      out[nm] = c.image_uris;
-      isFull[nm] = !!c.full_art;
-    });
-    // Only useful if we got a real spread of basics.
-    if (Object.keys(out).length < 3) return null;
-    artCache[code] = out;
-    return out;
+    if (page && page.data && page.data.length) {
+      var byName = {};
+      page.data.forEach(function(c){
+        if (!c || !c.image_uris || c.digital) return;
+        var nm = (c.name || '').replace(/^Snow-Covered /, '');
+        if (BASIC_ORDER.indexOf(nm) < 0) return;
+        var fancy = !!c.promo || c.border_color === 'gold' ||
+          (c.frame_effects || []).some(function(f){ return FANCY_FRAMES[f]; });
+        (byName[nm] = byName[nm] || []).push({
+          uris: c.image_uris,
+          full: !!c.full_art,
+          fancy: fancy,
+          // Two printings of one picture share an illustration id; that is
+          // how a reprint is recognised across sets.
+          ill: c.illustration_id || (c.set + '/' + c.collector_number),
+          cn: parseInt(c.collector_number, 10) || 0
+        });
+      });
+      out = {};
+      Object.keys(byName).forEach(function(nm){
+        var list = byName[nm];
+        var plain = list.filter(function(a){ return !a.fancy; });
+        if (plain.length) list = plain;
+        /* Full-art first. It is the printing a set is remembered for, and
+         * with only a handful of lands of each colour in a deck the front of
+         * the list is most of what gets seen. */
+        list.sort(function(a, b){
+          return (b.full ? 1 : 0) - (a.full ? 1 : 0) || a.cn - b.cn;
+        });
+        out[nm] = list;
+      });
+    }
   } catch (e) {
-    return null;
+    out = null;
   }
+  artCache[code] = (out && Object.keys(out).length) ? out : null;
+  return artCache[code];
+}
+
+// A useful set of basics covers most of the land types, not just one of them.
+function hasSpread(art){ return !!art && Object.keys(art).length >= 3; }
+
+/* A set's own basics, plus a flavour-matched stand-in if it has none — or
+ * only some. Arabian Nights prints exactly one basic, a Mountain, and it
+ * would be a shame to lose it; it comes back alongside the Alpha lands that
+ * cover the rest. */
+async function basicSourcesFor(code){
+  var out = [], mine = await fetchBasics(code);
+  if (mine) out.push({ code: code, art: mine, borrowed: false });
+  if (hasSpread(mine)) return out;
+  var chain = flavourChain(code);
+  for (var i = 0; i < chain.length; i++) {
+    var art = await fetchBasics(chain[i]);
+    if (hasSpread(art)) {
+      out.push({
+        code: chain[i], art: art, borrowed: true, from: code,
+        // Which types the set did manage on its own, so the note can say
+        // "only its Mountain" rather than the untrue "none of its own".
+        only: mine ? BASIC_ORDER.filter(function(nm){ return mine[nm]; }) : []
+      });
+      break;
+    }
+  }
+  return out;
 }
 
 /* Which sets the deck itself is made of.
@@ -9764,6 +9910,101 @@ function deckSetCodes(){
   return Object.keys(count).sort(function(a, b){ return count[b] - count[a]; }).slice(0, 8);
 }
 
+/* One pool of arts per land name, taken round-robin from every source, so
+ * the first few Forests come from different worlds rather than all from
+ * whichever set happened to contribute the most cards.
+ *
+ * A picture printed in more than one of these sets is credited to the
+ * earliest of them. Revised's Forests are Alpha's Forests, and a deck
+ * holding both should show the original once rather than the same painting
+ * twice under two different set codes. */
+function mergeArt(sources){
+  var owner = {};
+  sources.forEach(function(s, i){
+    var when = (setMeta(s.code) || {}).released_at || '9999-99-99';
+    Object.keys(s.art).forEach(function(nm){
+      s.art[nm].forEach(function(a){
+        var cur = owner[a.ill];
+        if (!cur || when < cur.when) owner[a.ill] = { i: i, when: when };
+      });
+    });
+  });
+  var pools = {};
+  BASIC_ORDER.forEach(function(nm){
+    var lists = sources.map(function(s, i){
+      return (s.art[nm] || []).filter(function(a){ return owner[a.ill].i === i; });
+    });
+    var out = [], depth = 0, more = true;
+    while (more) {
+      more = false;
+      for (var i = 0; i < lists.length; i++) {
+        if (lists[i].length > depth) { out.push(lists[i][depth]); more = true; }
+      }
+      depth++;
+    }
+    if (out.length) pools[nm] = out;
+  });
+  return pools;
+}
+
+// Any land type nobody in the deck printed, topped up from the era's chain.
+async function fillArtGaps(deck){
+  var missing = BASIC_ORDER.filter(function(nm){
+    return !deck.pools[nm] || !deck.pools[nm].length;
+  });
+  if (!missing.length) return;
+  var chain = flavourChain(deck.sources[0].code).concat(ART_FALLBACK);
+  for (var i = 0; i < chain.length && missing.length; i++) {
+    var art = await fetchBasics(chain[i]);
+    if (!art) continue;
+    var used = false;
+    missing = missing.filter(function(nm){
+      if (!art[nm] || !art[nm].length) return true;
+      deck.pools[nm] = art[nm].slice();
+      used = true;
+      return false;
+    });
+    if (used) (deck.filled = deck.filled || []).push(chain[i]);
+  }
+}
+
+function upper(c){ return String(c || '').toUpperCase(); }
+
+function listWords(a){
+  return a.length < 2 ? (a[0] || '')
+    : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+}
+
+function artCount(pools){
+  return BASIC_ORDER.reduce(function(n, nm){ return n + ((pools[nm] || []).length); }, 0);
+}
+
+function deckArtNote(deck){
+  var names = deck.sources.map(function(s){ return upper(s.code); });
+  var parts = [];
+  if (names.length === 1) {
+    parts.push(deck.sources[0].borrowed
+      ? 'Using ' + names[0] + ' basics — ' + upper(deck.sources[0].from) +
+        ', the one set this deck is made of, prints none of its own.'
+      : 'Using ' + names[0] + ' basics — the one set this deck is made of.');
+  } else {
+    parts.push('Basics from ' + names.length + ' sets: ' + names.join(', ') + '.');
+    deck.sources.filter(function(s){ return s.borrowed; }).forEach(function(s){
+      parts.push((s.only && s.only.length)
+        ? upper(s.from) + ' prints only its ' + listWords(s.only) + ', so ' +
+          upper(s.code) + ' fills in the rest.'
+        : upper(s.from) + ' prints none of its own, so ' + upper(s.code) +
+          ' stands in for it.');
+    });
+  }
+  if (deck.filled && deck.filled.length) {
+    parts.push('Missing land types filled from ' +
+      deck.filled.map(upper).join(', ') + '.');
+  }
+  parts.push(artCount(deck.pools) + ' different arts in all.');
+  return parts.join(' ');
+}
+
 /* Give each basic land its picture.
  *
  * S.landArt holds a list of arts per land name rather than one, so a deck can
@@ -9779,67 +10020,81 @@ function dressBasics(cards){
     var pool = S.landArt[c.name];
     if (!pool || !pool.length) return;
     var i = seen[c.name] = (seen[c.name] === undefined ? 0 : seen[c.name] + 1);
-    c.image_uris = pool[i % pool.length];
+    c.image_uris = pool[i % pool.length].uris;
   });
 }
 
+function useLandArt(pools, note){
+  S.landArt = pools;
+  $('landArtNote').textContent = note;
+  // Dress the basics already in the deck, and any already in play — art can
+  // arrive after the playtester has opened.
+  dressBasics(S.deck);
+  applyBasicArt();
+  refresh();
+}
+
 async function loadLandArt(){
-  /* Every set the deck is made of, each contributing its own basics. Falls
-   * back to the ordinary single-set chain if the deck has nothing to say
-   * yet, or if none of its sets prints basics. */
+  /* Every set the deck is made of, each contributing its own basics — or the
+   * nearest set in flavour to it. Falls back to the ordinary single-set
+   * chain if the deck has nothing to say yet. */
   if (S.landArtSet === 'deck') {
-    var codes = deckSetCodes();
-    var pools = {}, used = [];
+    var codes = deckSetCodes(), sources = [], seenSrc = {};
     for (var d = 0; d < codes.length; d++) {
-      var got = await fetchBasics(codes[d]);
-      if (!got) continue;
-      used.push(codes[d]);
-      Object.keys(got).forEach(function(nm){
-        (pools[nm] = pools[nm] || []).push(got[nm]);
-      });
+      var got = await basicSourcesFor(codes[d]);
+      for (var g = 0; g < got.length; g++) {
+        var key = String(got[g].code).toLowerCase();
+        if (seenSrc[key]) continue;
+        seenSrc[key] = 1;
+        sources.push(got[g]);
+      }
     }
-    if (used.length) {
-      S.landArt = pools;
-      S.landArtFrom = used.join(', ');
-      $('landArtNote').textContent = used.length === 1
-        ? 'Using ' + used[0].toUpperCase() + ' basics — the one set this deck is made of.'
-        : 'Basics from all ' + used.length + ' sets in this deck: ' +
-          used.map(function(x){ return x.toUpperCase(); }).join(', ') + '.';
-      dressBasics(S.deck);
-      applyBasicArt();
-      refresh();
+    if (sources.length) {
+      var deck = { sources: sources, pools: mergeArt(sources) };
+      await fillArtGaps(deck);
+      S.landArtFrom = sources.map(function(s){ return s.code; }).join(', ');
+      useLandArt(deck.pools, deckArtNote(deck));
       return;
     }
-    // Nothing drafted yet, or no basics among those sets: fall through.
+    // Nothing drafted yet: fall through.
   }
 
-  var chain = [];
+  var chain = [], asked = '';
   if (S.landArtSet === 'auto' || S.landArtSet === 'deck') {
-    if (S.artHintCode) chain.push(S.artHintCode);
-    else if (S.chosen && S.chosen.code && S.source !== 'cube') chain.push(S.chosen.code);
-    chain = chain.concat(ART_FALLBACK);
+    asked = S.artHintCode ||
+      ((S.chosen && S.chosen.code && S.source !== 'cube') ? S.chosen.code : '');
   } else {
-    chain = [S.landArtSet].concat(ART_FALLBACK);
+    asked = S.landArtSet;
   }
+  if (asked) chain = [asked].concat(flavourChain(asked));
+  chain = chain.concat(ART_FALLBACK);
+
   for (var i = 0; i < chain.length; i++) {
     var art = await fetchBasics(chain[i]);
-    if (art) {
-      // One art per name is simply a list of one.
-      var single = {};
-      Object.keys(art).forEach(function(nm){ single[nm] = [art[nm]]; });
-      S.landArt = single;
-      S.landArtFrom = chain[i];
-      var matched = (i === 0 && S.landArtSet !== 'deck');
-      $('landArtNote').textContent = matched
-        ? 'Using ' + chain[i].toUpperCase() + ' basics.'
-        : 'Using ' + chain[i].toUpperCase() + ' basics — the drafted sets have none of their own.';
-      // Dress the basics already in the deck, and any already in play — art
-      // can arrive after the playtester has opened.
-      dressBasics(S.deck);
-      applyBasicArt();
-      refresh();
-      return;
-    }
+    if (!hasSpread(art)) continue;
+    var matched = (i === 0 && S.landArtSet !== 'deck');
+    var pools = {};
+    Object.keys(art).forEach(function(nm){
+      var list = art[nm];
+      /* "Zendikar full-art" has to mean the full-art ones.
+       *
+       * Scryfall carries twenty Zendikar basics, half of them ordinary, and
+       * ordering by name put the ordinary ones first — so this menu item
+       * once quietly handed back the wrong lands. Variety is welcome
+       * everywhere else; here the label made a promise. */
+      if (matched && ART_FULL_ART[chain[i]]) {
+        var full = list.filter(function(a){ return a.full; });
+        if (full.length) list = full;
+      }
+      pools[nm] = list;
+    });
+    S.landArtFrom = chain[i];
+    useLandArt(pools, matched
+      ? 'Using ' + upper(chain[i]) + ' basics — ' + artCount(pools) + ' different arts.'
+      : 'Using ' + upper(chain[i]) + ' basics — ' + (asked
+          ? upper(asked) + ' prints none of its own.'
+          : 'the drafted sets have none of their own.'));
+    return;
   }
   $('landArtNote').textContent = 'Could not load basic land art — showing text tiles.';
 }
