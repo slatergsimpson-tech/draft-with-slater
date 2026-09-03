@@ -123,7 +123,7 @@ with four bots — you don't need eight people.
 
 ### 8. Choose what you're drafting
 
-Below the lobby, the usual tabs: a set, Pack It Up, a cube. Pick one. The lobby
+Below the lobby, the usual tabs: Chaos Draft, a set, a cube. Pick one. The lobby
 line updates to show what the table is about to open, and the Start button
 unlocks.
 
@@ -511,6 +511,15 @@ source before pressing Start.
 GitHub Pages once and open that address on the phone — drafting alone needs no
 server at all. Step-by-step in *Giving yourself a permanent address*. Add
 Render only if you also want to draft *with friends* while the computer is off.
+
+**What is Chaos Draft?** The mode the app opens on, and the one most worth
+your time. Three packs, eight players, one pod — but every pack can come from
+a different corner of thirty years. Pull the handle, watch three reels of set
+symbols settle, and draft whatever they land on. Open **Pin a pack** if you
+want to fix one of the three to a set you have been meaning to try, or narrow
+a slot to an era; whatever you pin is left alone and the rest are rolled.
+**Who opens what** decides whether the whole table shares a set each round or
+every seat opens its own — the second is the real thing.
 
 **Can I draft the Un-sets?** Yes — Unglued, Unhinged, Unstable, Unsanctioned
 and Unfinity are all in the set list, in their own eras. Pack sizes are the

@@ -684,6 +684,45 @@
   #setMark.on{opacity:.05}
   [data-mode="dark"] #setMark{filter:invert(1)}
   @media(max-width:900px){ #setMark{display:none} }
+  /* --- the roll ------------------------------------------------------
+   * Three reels of set symbols. They spin together and settle one at a
+   * time, left to right, because a result that arrives all at once is not
+   * a result you get to watch. */
+  .slot{background:var(--panel2); border:1px solid var(--line2); border-radius:14px;
+        padding:16px; text-align:center}
+  .slotreels{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px}
+  .reel{background:var(--bg2); border:1px solid var(--line2); border-radius:10px;
+        min-height:132px; padding:12px 8px; display:flex; flex-direction:column;
+        align-items:center; justify-content:center; gap:4px; overflow:hidden;
+        position:relative; transition:border-color .2s, transform .2s}
+  .reel img.sicon{width:38px; height:30px; object-fit:contain; opacity:.9}
+  [data-mode="dark"] .reel img.sicon{filter:invert(1)}
+  .reel b{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; color:var(--gold2)}
+  .reel i{font-style:normal; font-size:11.5px; color:var(--ink2); line-height:1.3;
+          display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .reel u{text-decoration:none; font-size:10.5px; color:var(--ink3); font-variant-numeric:tabular-nums}
+  .reel .reelblank{color:var(--ink3); font-size:22px}
+  /* Spinning: the face blurs and the frame loosens. */
+  .reel.spinning{border-color:var(--line2)}
+  .reel.spinning img.sicon, .reel.spinning b, .reel.spinning i, .reel.spinning u{
+    filter:blur(1.4px); opacity:.75}
+  [data-mode="dark"] .reel.spinning img.sicon{filter:invert(1) blur(1.4px)}
+  /* Settling: one beat of gold as it stops. */
+  .reel.settled{border-color:var(--gold); animation:reelstop .45s ease}
+  @keyframes reelstop{
+    0%{transform:translateY(-7px)} 55%{transform:translateY(2px)} 100%{transform:none}
+  }
+  /* A pinned pack is not rolled, and says so. */
+  .reel.pinned{border-color:var(--line2); box-shadow:inset 0 0 0 1px var(--line)}
+  .reel .pin{position:absolute; top:6px; right:8px; font-size:9.5px; letter-spacing:.7px;
+             text-transform:uppercase; color:var(--ink3)}
+  .slotpull{width:100%; font-size:15px; padding:12px 18px}
+  .slothint{margin-top:9px}
+  @media(max-width:560px){
+    .reel{min-height:112px; padding:9px 5px}
+    .reel i{font-size:10.5px}
+  }
+
   /* --- setup, in two steps: when, then what ------------------------- */
   .stephead{display:flex; gap:14px; align-items:center; margin-bottom:14px}
   .stephead h3{font-size:18px}
@@ -888,13 +927,13 @@
       </details>
 
       <div class="tabs" id="sourceTabs">
-        <button class="tab on" data-src="set">Draft a set</button>
-        <button class="tab" data-src="chaos">Pack it up</button>
+        <button class="tab on" data-src="chaos">Chaos Draft</button>
+        <button class="tab" data-src="set">Draft a set</button>
         <button class="tab" data-src="cube">Draft a cube</button>
       </div>
 
       <!-- ---- set source ---- -->
-      <div id="srcSet">
+      <div id="srcSet" class="hidden">
         <div id="setsLoading" class="loading"><div class="spinner"></div>Loading set list from Scryfall…</div>
         <div id="setsError" class="err hidden"></div>
 
@@ -994,15 +1033,31 @@
       </div>
 
       <!-- ---- pack it up (chaos) source ---- -->
-      <div id="srcChaos" class="hidden">
-        <p class="hint" style="margin-bottom:16px">
-          Three packs, eight players, one pod — but every pack can come from a different set.
-          Leave a slot on Random for a genuine surprise, or pin it to a set you want to draft.
-          Choose below whether the table shares a set each round or every seat opens its own,
-          and use <b>Show the table</b> to see exactly what all eight seats will open before
-          you commit to it.
+      <div id="srcChaos">
+        <p class="hint" style="margin-bottom:14px">
+          Three packs, eight players, one pod — and every pack can come from a different
+          corner of thirty years. Pull the handle and see where you land.
         </p>
-        <div id="chaosSlots"></div>
+
+        <!-- The roll. Three reels of set symbols, settling one at a time. -->
+        <div class="slot">
+          <div class="slotreels" id="chaosReels"></div>
+          <button id="btnChaosRoll" class="btn primary slotpull">Roll the packs</button>
+          <div class="hint slothint" id="chaosRollHint">
+            Any pack you have pinned below stays where it is; the rest are rolled.
+          </div>
+        </div>
+
+        <details class="mpbox" id="chaosPin" style="margin:16px 0">
+          <summary>Pin a pack, or narrow where it can come from</summary>
+          <div class="mpbody">
+            <p class="hint">
+              Choose a set for any of the three and the reel will leave it alone. Leave one
+              on Random — or on an era — and it gets rolled with the rest.
+            </p>
+            <div id="chaosSlots"></div>
+          </div>
+        </details>
         <div class="field">
           <label for="chaosMode">Who opens what</label>
           <select id="chaosMode" style="width:100%">
@@ -1035,7 +1090,6 @@
         </div>
         <div id="chaosPreview" class="note hidden"></div>
         <div class="row" style="margin-top:8px">
-          <button id="btnChaosRollAll" class="btn" style="flex:0 0 auto">Roll all three</button>
           <button id="btnChaosPeek" class="btn" style="flex:0 0 auto"
                   aria-expanded="false" aria-controls="chaosTable">Show the table</button>
           <button id="btnChaosStart" class="btn primary" style="flex:1">Start the draft</button>
@@ -4794,9 +4848,10 @@ async function resolveNames(names, onProgress){
 var S = {
   sets: [], era: 'all', chosen: null, cards: [], draft: null,
   pool: [], deck: [], sealed: false, picksPerTurn: 1,
-  source: 'set', cube: [], cubeMode: 'find', searchResults: [],
+  source: 'chaos', cube: [], cubeMode: 'find', searchResults: [],
   deckView: 'piles', commander: null, deckTarget: 40, spellTarget: 23,
   poolSort: 'cmc', zone: 'deck', showDetails: false, search: '', play: null, landArt: null, landArtSet: 'deck',
+  chaosPinned: [false, false, false],
   chaosRounds: null, chaosPerSeat: false, chaosSkipped: '', chaosPlan: null,
   chaosPrefetchError: '', waitTimer: null, lastSeed: 0, artHintCode: null,
   bonusSheets: true, bonusRate: 0.25, allSets: [], bonusLoaded: [], strict: false
@@ -6908,6 +6963,7 @@ function renderChaosSlots(){
       if (!pool.length) return;
       var pick = pool[Math.floor(Math.random() * pool.length)];
       S.chaosSlots[i] = pick.code;
+      S.chaosPinned[i] = false;
       sel.innerHTML = chaosOptionsHTML(pick.code, filter.value);
       sel.value = pick.code;
       $('chaosRolled' + i).textContent = 'Rolled ' + pick.name + ' (' +
@@ -6915,6 +6971,7 @@ function renderChaosSlots(){
       $('chaosPreview').classList.add('hidden');
       $('chaosPreview').classList.remove('err');
       updateChaosHint();
+      renderChaosReels();
       announce('Pack ' + (i + 1) + ': ' + pick.name);
     };
 
@@ -6928,12 +6985,15 @@ function renderChaosSlots(){
     };
     sel.onchange = function(){
       S.chaosSlots[i] = sel.value;
+      S.chaosPinned[i] = sel.value.indexOf('random') !== 0;
       $('chaosPreview').classList.add('hidden');
       $('chaosPreview').classList.remove('err');
       updateChaosHint();
+      renderChaosReels();     // pinning shows on the reel at once
     };
   });
   updateChaosHint();
+  renderChaosReels();
 }
 $('chaosMode').onchange = updateChaosHint;
 
@@ -7038,9 +7098,146 @@ function resolveChaosRounds(seed, perSeat, seats, spread){
   });
 }
 
-$('btnChaosRollAll').onclick = function(){
-  [0, 1, 2].forEach(function(i){ $('chaosRoll' + i).click(); });
-};
+/* ---------------- the roll ----------------
+ *
+ * Rolling three sets is the moment this mode is about, and it used to be a
+ * button that silently rewrote three dropdowns. Now the three reels spin and
+ * settle one at a time, left to right, so the result arrives at the speed you
+ * can actually watch it. A pack you have pinned is left alone.
+ *
+ * Nothing here decides anything: the sets are chosen up front, and the
+ * animation only reveals what was already rolled. Skipping it — which is what
+ * reduced motion does — gives exactly the same three sets. */
+
+var CHAOS_ROLLING = false;
+
+function chaosSetByCode(code){
+  return (S.sets || []).filter(function(x){ return x.code === code; })[0] || null;
+}
+
+/* Is this slot one the player chose, rather than one the reels landed on?
+ *
+ * The difference matters and is not visible in the value alone: rolling
+ * leaves a concrete set code behind exactly as pinning does, so going by the
+ * code meant every slot looked pinned the moment it had been rolled once —
+ * and the second pull of the handle rolled nothing at all. */
+function chaosSlotPinned(i){
+  var v = S.chaosSlots[i];
+  return !!S.chaosPinned[i] && !!v && v.indexOf('random') !== 0;
+}
+
+function chaosReelFace(set, pinned){
+  if (!set) return '<span class="reelblank">&#9679;&#9679;&#9679;</span>';
+  return (pinned ? '<span class="pin">pinned</span>' : '') +
+    (set.icon_svg_uri ? '<img class="sicon" src="' + esc(set.icon_svg_uri) + '" alt="">' : '') +
+    '<b>' + esc((set.code || '').toUpperCase()) + '</b>' +
+    '<i>' + esc(set.name || '') + '</i>' +
+    '<u>' + esc((set.released_at || '').slice(0, 4)) + '</u>';
+}
+
+function renderChaosReels(){
+  $('chaosReels').innerHTML = [0, 1, 2].map(function(i){
+    /* Show whatever the slot actually holds, however it got there — a reel
+     * that blanked itself because a *different* pack was pinned would be
+     * lying about what is loaded. The badge is what marks a pin. */
+    var pinned = chaosSlotPinned(i);
+    var code = S.chaosSlots[i];
+    var set = (code && code.indexOf('random') !== 0) ? chaosSetByCode(code) : null;
+    return '<div class="reel' + (pinned ? ' pinned' : '') + '" id="chaosReel' + i + '" ' +
+      'role="img" aria-label="Pack ' + (i + 1) + ': ' +
+      esc(set ? set.name : 'not rolled yet') + '">' +
+      chaosReelFace(set, pinned) + '</div>';
+  }).join('');
+}
+
+function rollChaosPacks(){
+  if (CHAOS_ROLLING) return;
+  if (!S.sets || !S.sets.length) return;
+
+  // Decide everything first; the reels are only how it is shown.
+  var spin = [], results = {};
+  [0, 1, 2].forEach(function(i){
+    if (chaosSlotPinned(i)) return;
+    var pool = chaosCandidates(S.chaosSlots[i].indexOf('random') === 0 ? S.chaosSlots[i] : 'random');
+    var filter = $('chaosFilter' + i);
+    var q = filter ? (filter.value || '').toLowerCase().trim() : '';
+    if (q) {
+      var narrowed = pool.filter(function(x){
+        return x.name.toLowerCase().indexOf(q) !== -1 || x.code.toLowerCase().indexOf(q) !== -1;
+      });
+      if (narrowed.length) pool = narrowed;
+    }
+    if (!pool.length) return;
+    results[i] = { set: pool[Math.floor(Math.random() * pool.length)], pool: pool };
+    spin.push(i);
+  });
+
+  var settle = function(i){
+    var r = results[i];
+    if (!r) return;
+    S.chaosSlots[i] = r.set.code;
+    S.chaosPinned[i] = false;
+    var el = $('chaosReel' + i);
+    if (el){
+      el.innerHTML = chaosReelFace(r.set, false);
+      el.classList.remove('spinning');
+      el.classList.add('settled');
+      el.setAttribute('aria-label', 'Pack ' + (i + 1) + ': ' + r.set.name);
+    }
+    var sel = $('chaosSlot' + i), filt = $('chaosFilter' + i);
+    if (sel){
+      sel.innerHTML = chaosOptionsHTML(r.set.code, filt ? filt.value : '');
+      sel.value = r.set.code;
+    }
+    var note = $('chaosRolled' + i);
+    if (note) note.textContent = 'Rolled ' + r.set.name + ' (' +
+      r.set.code.toUpperCase() + ', ' + (r.set.released_at || '').slice(0, 4) + ').';
+  };
+
+  var done = function(){
+    CHAOS_ROLLING = false;
+    $('btnChaosRoll').disabled = false;
+    $('btnChaosRoll').textContent = 'Roll again';
+    $('chaosPreview').classList.add('hidden');
+    $('chaosTable').classList.add('hidden');
+    $('btnChaosPeek').setAttribute('aria-expanded', 'false');
+    updateChaosHint();
+    announce(spin.map(function(i){
+      return 'Pack ' + (i + 1) + ': ' + (results[i] ? results[i].set.name : 'unchanged');
+    }).join('. '));
+  };
+
+  if (!spin.length) { announce('All three packs are pinned — nothing to roll.'); return; }
+
+  // Reduced motion, or no animation wanted: the same result, immediately.
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (still) { spin.forEach(settle); done(); return; }
+
+  CHAOS_ROLLING = true;
+  $('btnChaosRoll').disabled = true;
+  $('btnChaosRoll').textContent = 'Rolling…';
+  spin.forEach(function(i){
+    var el = $('chaosReel' + i);
+    if (el){ el.classList.remove('settled'); el.classList.add('spinning'); }
+  });
+
+  var stopAt = {};
+  spin.forEach(function(i, n){ stopAt[i] = 620 + n * 460; });
+  var started = Date.now(), left = spin.slice();
+  var tick = setInterval(function(){
+    var t = Date.now() - started;
+    left = left.filter(function(i){
+      if (t >= stopAt[i]) { settle(i); return false; }
+      var el = $('chaosReel' + i);
+      var pool = results[i].pool;
+      if (el) el.innerHTML = chaosReelFace(pool[Math.floor(Math.random() * pool.length)], false);
+      return true;
+    });
+    if (!left.length) { clearInterval(tick); done(); }
+  }, 80);
+}
+
+$('btnChaosRoll').onclick = rollChaosPacks;
 
 /* Load every distinct set a slice of the plan needs.
  *
