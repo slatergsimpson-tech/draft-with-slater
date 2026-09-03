@@ -2630,29 +2630,27 @@
       }
     }
 
-    /* Rotate packs.
+    /* Rotate packs — exactly one seat, always.
      *
-     * Packs can be different sizes when every seat opened a different set, so
-     * the small ones run out first. An emptied pack simply leaves the
-     * rotation: keep passing until the seat is holding a pack with cards in
-     * it, or until the table has nothing left. */
+     * This used to spin again whenever seat zero landed on an empty pack,
+     * which quietly broke the one rule a draft has: a pack visits each seat
+     * in turn. Mixing sets mixes pack sizes, so the eight-card boosters empty
+     * a lap before the fifteens; the extra spins then moved *every* pack two
+     * seats at a time, so half the table was skipped on every turn after the
+     * first lap and seat zero drew more cards than its share.
+     *
+     * A pack that has run out simply keeps travelling, empty, and whoever is
+     * holding it has no pick that turn. That is what happens at a real table
+     * when the packs are not the same size, and it keeps the order honest. */
     var dir = passDirection(state.round);
-    var rotateOnce = function () {
-      var rotated = new Array(state.seats);
-      for (var s = 0; s < state.seats; s++) {
-        rotated[(s + dir + state.seats) % state.seats] = state.packs[s];
-      }
-      state.packs = rotated;
-    };
+    var rotated = new Array(state.seats);
+    for (var s = 0; s < state.seats; s++) {
+      rotated[(s + dir + state.seats) % state.seats] = state.packs[s];
+    }
+    state.packs = rotated;
     var anyCards = function () {
       return state.packs.some(function (p) { return p && p.length; });
     };
-    rotateOnce();
-    var spins = 0;
-    while ((!state.packs[0] || !state.packs[0].length) && anyCards() && spins < state.seats) {
-      rotateOnce();
-      spins++;
-    }
     state.pickNumber++;
 
     // The round is over only when every pack at the table is empty.
@@ -2663,6 +2661,26 @@
       } else {
         startRound(state);
       }
+    }
+    return state;
+  }
+
+  /* Carry the draft forward through turns these seats cannot take part in.
+   *
+   * A seat holding an emptied pack has no pick, but the rest of the table
+   * still does — so the turn happens, the bots take theirs, and the packs
+   * move on. Without this the draft would sit waiting for a pick that the
+   * cards make impossible. */
+  function advancePastEmpty(state, seats) {
+    seats = (seats && seats.length) ? seats : [0];
+    var guard = 0;
+    while (!state.done && !state.waiting && guard++ < state.seats * 4) {
+      var canPick = seats.some(function (s) {
+        return state.packs[s] && state.packs[s].length;
+      });
+      if (canPick) break;
+      if (!state.packs.some(function (p) { return p && p.length; })) break;
+      endTurn(state, []);
     }
     return state;
   }
@@ -2679,7 +2697,8 @@
     var already = new Array(state.seats);
     already[0] = state.pending.length;
     state.pending = [];
-    return endTurn(state, already);
+    endTurn(state, already);
+    return advancePastEmpty(state, [0]);
   }
 
   /* Several seats pick at once, which is what a table of people is.
@@ -2688,7 +2707,7 @@
    * that seat is taking. Any seat left out is played by its bot, which is how
    * both an empty chair and a pick timer running out are handled: they are the
    * same thing as far as the draft is concerned. */
-  function makeSeatPicks(state, choices) {
+  function makeSeatPicks(state, choices, humanSeats) {
     if (state.done) return state;
     var already = new Array(state.seats);
     for (var seat = 0; seat < state.seats; seat++) {
@@ -2702,7 +2721,9 @@
       already[seat] = took;
     }
     state.pending = [];
-    return endTurn(state, already);
+    endTurn(state, already);
+    // Carry on past any turn in which nobody at a keyboard can pick.
+    return advancePastEmpty(state, humanSeats);
   }
 
   /* Find a card in a seat's pack by the id the network speaks in. Cards are
@@ -3542,6 +3563,7 @@
     currentSetInfo: currentSetInfo,
     makePick: makePick,
     makeSeatPicks: makeSeatPicks,
+    advancePastEmpty: advancePastEmpty,
     cardInPack: cardInPack,
     botChoose: botChoose,
     botLearn: botLearn,
@@ -4774,7 +4796,7 @@ var S = {
   pool: [], deck: [], sealed: false, picksPerTurn: 1,
   source: 'set', cube: [], cubeMode: 'find', searchResults: [],
   deckView: 'piles', commander: null, deckTarget: 40, spellTarget: 23,
-  poolSort: 'cmc', zone: 'deck', showDetails: false, search: '', play: null, landArt: null, landArtSet: 'auto',
+  poolSort: 'cmc', zone: 'deck', showDetails: false, search: '', play: null, landArt: null, landArtSet: 'deck',
   chaosRounds: null, chaosPerSeat: false, chaosSkipped: '', chaosPlan: null,
   chaosPrefetchError: '', waitTimer: null, lastSeed: 0, artHintCode: null,
   bonusSheets: true, bonusRate: 0.25, allSets: [], bonusLoaded: [], strict: false
@@ -6150,7 +6172,13 @@ function hostSendPacks(){
   var d = S.draft;
   if (!d || d.done) return;
   MP.picks = {};
-  MP.waitingOn = N.humanSeats(MP.table).filter(function(s){ return s !== 0; });
+  /* Only wait on seats that can actually pick. A seat holding a pack that has
+   * run out — which happens as soon as sets with different booster sizes are
+   * mixed — has no card to send back, and waiting for one would stall the
+   * whole table until the timer rescued it. */
+  MP.waitingOn = N.humanSeats(MP.table).filter(function(s){
+    return s !== 0 && d.packs[s] && d.packs[s].length;
+  });
   var deadline = MP.timer ? Date.now() + MP.timer * 1000 : 0;
   MP.deadline = deadline;
 
@@ -6215,7 +6243,8 @@ function hostResolveTurn(byTimer){
   Object.keys(MP.picks).forEach(function(seat){ choices[seat] = MP.picks[seat]; });
   if (MP.hostPick) choices[0] = MP.hostPick;
 
-  E.makeSeatPicks(S.draft, choices);
+  // The human seats, so the draft can carry past turns none of them can play.
+  E.makeSeatPicks(S.draft, choices, N.humanSeats(MP.table));
   MP.hostPick = null;
   MP.hostPicked = false;
 
@@ -7075,7 +7104,7 @@ async function loadChaosStage(rounds, opts){
 
   return {
     cards: cardsBySet, good: good, dead: dead, failures: failures,
-    swap: function(set){ return subs[set.code] || set; },
+    swap: function(set){ return (set && subs[set.code]) || set || good[0]; },
     note: dead.length && good.length
       ? dead.map(function(x){ return x.name; }).join(', ') +
         ' had nothing to open, so ' + (dead.length === 1 ? 'it was' : 'they were') + ' swapped out.'
@@ -7096,12 +7125,24 @@ async function prefetchChaosRounds(plan, from){
       if (!stage.good.length) continue;              // try the next round anyway
       var seats = S.draft.seatRounds && S.draft.seatRounds[i];
       if (!seats) continue;
+      /* Every seat must come out of this holding real cards.
+       *
+       * A seat left with none can never be ready, and the round it belongs
+       * to waits for it for ever — the draft simply stops on "shuffling up
+       * pack three" with no way forward. So a seat whose set died, or whose
+       * plan is short, or which was substituted to something that did not
+       * load either, falls back to one of the sets that did. */
       var sources = plan[i].seats || null;
       for (var sIdx = 0; sIdx < seats.length; sIdx++) {
-        var want = sources ? sources[sIdx] : plan[i].shared;
-        var use = stage.swap(want);
+        var want = (sources && sources[sIdx]) || plan[i].shared || stage.good[0];
+        var use = stage.swap(want) || stage.good[0];
+        var got = use && stage.cards[use.code];
+        if (!got || !got.length) {
+          use = stage.good[sIdx % stage.good.length];
+          got = stage.cards[use.code];
+        }
         seats[sIdx].setInfo = use;
-        seats[sIdx].cards = stage.cards[use.code] || null;
+        seats[sIdx].cards = (got && got.length) ? got : null;
       }
       if (stage.note) {
         S.chaosSkipped = (S.chaosSkipped ? S.chaosSkipped + ' ' : '') + stage.note;
@@ -7556,6 +7597,10 @@ function startPlay(seedOverride){
   // diary is cleared too, so a table you left cannot narrate a solo draft.
   S.story = null;
   S.pileScroll = 0;
+  /* A new draft is a new set of worlds, so the basics have to be worked out
+   * again. Without this the lands kept whatever art the last draft chose —
+   * and in deck mode the caption confidently named the wrong set. */
+  S.landArt = null;
   S.winston = null;
   S.winstonMP = false;
   MP.winstonGuest = false;
@@ -8036,6 +8081,14 @@ function renderDraft(){
     $('loadBar').style.width = '60%';
     startFlavour();
     if (!S.waitTimer) {
+      /* Give up eventually rather than spinning for ever.
+       *
+       * A round whose sets never arrive — Scryfall unreachable, or every set
+       * in it turning out to have nothing openable — used to leave the app on
+       * this screen with no way forward and a pool it would not hand back.
+       * After a generous wait the draft ends where it stands and you keep
+       * what you drafted, which is worth more than a spinner. */
+      var waitedMs = 0;
       S.waitTimer = setInterval(function(){
         if (!S.draft || !S.draft.waiting) {
           clearInterval(S.waitTimer); S.waitTimer = null;
@@ -8045,6 +8098,18 @@ function renderDraft(){
         if (E.resumeRound(S.draft)) {
           clearInterval(S.waitTimer); S.waitTimer = null;
           show('viewDraft'); renderDraft();
+          return;
+        }
+        waitedMs += 400;
+        if (waitedMs >= 45000) {
+          clearInterval(S.waitTimer); S.waitTimer = null;
+          S.draft.done = true;
+          S.pool = S.draft.humanPool.slice();
+          stopFlavour();
+          show('viewBuild');
+          renderBuild();
+          announce('Pack ' + (S.draft.round + 1) + ' never arrived — finishing with what you drafted.');
+          maybeShowStory();
         }
       }, 400);
     }
@@ -8052,8 +8117,18 @@ function renderDraft(){
   }
   if (S.waitTimer) { clearInterval(S.waitTimer); S.waitTimer = null; }
 
+  /* An empty pack in front of you is not the end of the draft — with mixed
+   * booster sizes it just means this one ran out and the table is still
+   * playing. Carry forward to the next turn you are actually in. */
   var pack = E.currentPack(d);
-  if (!pack || !pack.length) { d.done = true; S.pool = d.humanPool.slice(); show('viewBuild'); renderBuild(); maybeShowStory(); return; }
+  if (!pack || !pack.length) {
+    E.advancePastEmpty(d, [0]);
+    pack = E.currentPack(d);
+  }
+  if (d.done || !pack || !pack.length) {
+    d.done = true; S.pool = d.humanPool.slice();
+    show('viewBuild'); renderBuild(); maybeShowStory(); return;
+  }
 
   $('stPack').textContent = d.round + 1;
   $('stPick').textContent = d.pickNumber + 1;
@@ -8586,9 +8661,7 @@ function setBasicCount(name, n){
   var counts = E.countBasics(S.deck);
   counts[name] = Math.max(0, n);
   S.deck = E.nonBasics(S.deck).concat(E.basicCards(counts));
-  if (S.landArt) S.deck.forEach(function(c){
-    if (c.__basic && S.landArt[c.name]) c.image_uris = S.landArt[c.name];
-  });
+  dressBasics(S.deck);
   refresh();
 }
 
@@ -8667,9 +8740,7 @@ function renderLandPanel(spells, landTotal){
     var now = suggestedBasics();
     var nowTotal = Object.keys(now).reduce(function(a,k){ return a+now[k]; },0);
     S.deck = E.nonBasics(S.deck).concat(E.basicCards(now));
-    if (S.landArt) S.deck.forEach(function(c){
-      if (c.__basic && S.landArt[c.name]) c.image_uris = S.landArt[c.name];
-    });
+    dressBasics(S.deck);
     refresh();
     announce('Mana base set to ' + nowTotal + ' basic lands');
   };
@@ -8783,9 +8854,7 @@ $('btnAuto').onclick = function(){
   S.deck = S.deck.concat(poolLands.slice(0, Math.max(0, landTarget() - 8)));
   // Finish the deck with real basic lands rather than implied ones.
   S.deck = S.deck.concat(E.basicCards(suggestedBasics(true)));
-  if (S.landArt) S.deck.forEach(function(c){
-    if (c.__basic && S.landArt[c.name]) c.image_uris = S.landArt[c.name];
-  });
+  dressBasics(S.deck);
   refresh();
 };
 
@@ -9219,7 +9288,7 @@ $('btnRedraft').onclick = function(){
 $('btnRestart').onclick = function(){
   resetDeckPanel();
   S.draft = null; S.pool = []; S.deck = []; S.chosen = null; S.cards = []; S.commander = null;
-  S.chaosRounds = null; S.artHintCode = null;
+  S.chaosRounds = null; S.artHintCode = null; S.landArt = null;
   clearAmbient();
   $('hdrSet').classList.add('hidden');
   $('btnRestart').classList.add('hidden');
@@ -9238,7 +9307,8 @@ $('btnRestart').onclick = function(){
  * them in art. First choice is the set being drafted; sets with no basics of
  * their own fall back down a list of era-appropriate printings. */
 var ART_CHOICES = [
-  { code: 'auto', name: 'Match this set (recommended)' },
+  { code: 'deck', name: 'From the sets in your deck (recommended)' },
+  { code: 'auto', name: 'Match the set being drafted' },
   { code: 'lea',  name: 'Alpha (1993)' },
   { code: '3ed',  name: 'Revised (1994)' },
   { code: 'ice',  name: 'Ice Age (1995)' },
@@ -9292,9 +9362,72 @@ async function fetchBasics(code){
   }
 }
 
+/* Which sets the deck itself is made of.
+ *
+ * In a chaos draft a deck is a souvenir of five or six different worlds, and
+ * its lands may as well say so. Ordered by how many cards each set
+ * contributed, so the set you actually drafted leads. */
+function deckSetCodes(){
+  var count = {};
+  (S.deck || []).concat(S.pool || []).forEach(function(c){
+    if (!c || c.__basic || !c.set) return;
+    if (E.isBasicLand(c)) return;
+    count[c.set] = (count[c.set] || 0) + 1;
+  });
+  return Object.keys(count).sort(function(a, b){ return count[b] - count[a]; }).slice(0, 8);
+}
+
+/* Give each basic land its picture.
+ *
+ * S.landArt holds a list of arts per land name rather than one, so a deck can
+ * carry Forests from three different worlds at once. They are handed out by
+ * position rather than at random: nine Forests over three arts comes out
+ * three, three and three, and it stays that way when the count changes
+ * instead of reshuffling under you. */
+function dressBasics(cards){
+  if (!S.landArt || !cards) return;
+  var seen = {};
+  cards.forEach(function(c){
+    if (!c || !c.__basic) return;
+    var pool = S.landArt[c.name];
+    if (!pool || !pool.length) return;
+    var i = seen[c.name] = (seen[c.name] === undefined ? 0 : seen[c.name] + 1);
+    c.image_uris = pool[i % pool.length];
+  });
+}
+
 async function loadLandArt(){
+  /* Every set the deck is made of, each contributing its own basics. Falls
+   * back to the ordinary single-set chain if the deck has nothing to say
+   * yet, or if none of its sets prints basics. */
+  if (S.landArtSet === 'deck') {
+    var codes = deckSetCodes();
+    var pools = {}, used = [];
+    for (var d = 0; d < codes.length; d++) {
+      var got = await fetchBasics(codes[d]);
+      if (!got) continue;
+      used.push(codes[d]);
+      Object.keys(got).forEach(function(nm){
+        (pools[nm] = pools[nm] || []).push(got[nm]);
+      });
+    }
+    if (used.length) {
+      S.landArt = pools;
+      S.landArtFrom = used.join(', ');
+      $('landArtNote').textContent = used.length === 1
+        ? 'Using ' + used[0].toUpperCase() + ' basics — the one set this deck is made of.'
+        : 'Basics from all ' + used.length + ' sets in this deck: ' +
+          used.map(function(x){ return x.toUpperCase(); }).join(', ') + '.';
+      dressBasics(S.deck);
+      applyBasicArt();
+      refresh();
+      return;
+    }
+    // Nothing drafted yet, or no basics among those sets: fall through.
+  }
+
   var chain = [];
-  if (S.landArtSet === 'auto') {
+  if (S.landArtSet === 'auto' || S.landArtSet === 'deck') {
     if (S.artHintCode) chain.push(S.artHintCode);
     else if (S.chosen && S.chosen.code && S.source !== 'cube') chain.push(S.chosen.code);
     chain = chain.concat(ART_FALLBACK);
@@ -9304,17 +9437,18 @@ async function loadLandArt(){
   for (var i = 0; i < chain.length; i++) {
     var art = await fetchBasics(chain[i]);
     if (art) {
-      S.landArt = art;
+      // One art per name is simply a list of one.
+      var single = {};
+      Object.keys(art).forEach(function(nm){ single[nm] = [art[nm]]; });
+      S.landArt = single;
       S.landArtFrom = chain[i];
-      var matched = (i === 0 && S.landArtSet === 'auto');
+      var matched = (i === 0 && S.landArtSet !== 'deck');
       $('landArtNote').textContent = matched
         ? 'Using ' + chain[i].toUpperCase() + ' basics.'
-        : 'This set has no basics of its own — using ' + chain[i].toUpperCase() + ' instead.';
+        : 'Using ' + chain[i].toUpperCase() + ' basics — the drafted sets have none of their own.';
       // Dress the basics already in the deck, and any already in play — art
       // can arrive after the playtester has opened.
-      S.deck.forEach(function(c){
-        if (c.__basic && S.landArt[c.name]) c.image_uris = S.landArt[c.name];
-      });
+      dressBasics(S.deck);
       applyBasicArt();
       refresh();
       return;
@@ -9362,7 +9496,7 @@ function applyBasicArt(){
   if (!S.landArt || !S.play) return;
   E.PLAY_ZONES.forEach(function(z){
     S.play[z].forEach(function(c){
-      if (c.__basic && S.landArt[c.name]) c.image_uris = S.landArt[c.name];
+      if (c.__basic) dressBasics([c]);
     });
   });
 }
