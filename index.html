@@ -684,6 +684,26 @@
   #setMark.on{opacity:.05}
   [data-mode="dark"] #setMark{filter:invert(1)}
   @media(max-width:900px){ #setMark{display:none} }
+  /* --- jumping to the ends of a long screen --------------------------
+   *
+   * At the card sizes that read well on a phone — one or two across — a
+   * fifteen-card pack is several screens tall, and the last card is a long
+   * way from the first. These sit out of the way in the corner and go
+   * straight to either end. Only on narrow screens, and only when there is
+   * enough below the fold to be worth jumping. */
+  #ends{
+    position:fixed; right:12px; z-index:120; display:none;
+    bottom:calc(14px + env(safe-area-inset-bottom, 0px));
+    flex-direction:column; gap:8px;
+  }
+  #ends.on{display:flex}
+  #ends button{
+    width:44px; height:44px; border-radius:50%; padding:0; font-size:17px;
+    background:var(--panel); border:1px solid var(--gold); color:var(--gold2);
+    box-shadow:0 4px 14px rgba(0,0,0,.45); line-height:1;
+  }
+  #ends button:disabled{opacity:.35; border-color:var(--line2); color:var(--ink3)}
+
   /* --- the roll ------------------------------------------------------
    * Three reels of set symbols. They spin together and settle one at a
    * time, left to right, because a result that arrives all at once is not
@@ -705,8 +725,13 @@
   /* Spinning: the face blurs and the frame loosens. */
   .reel.spinning{border-color:var(--line2)}
   .reel.spinning img.sicon, .reel.spinning b, .reel.spinning i, .reel.spinning u{
-    filter:blur(1.4px); opacity:.75}
+    filter:blur(1.4px); opacity:.75; animation:reelroll .19s linear infinite}
   [data-mode="dark"] .reel.spinning img.sicon{filter:invert(1) blur(1.4px)}
+  /* Faces travel downward as they are swapped, so the reel reads as turning
+     rather than merely flickering. */
+  @keyframes reelroll{
+    from{transform:translateY(-9px)} to{transform:translateY(9px)}
+  }
   /* Settling: one beat of gold as it stops. */
   .reel.settled{border-color:var(--gold); animation:reelstop .45s ease}
   @keyframes reelstop{
@@ -1217,6 +1242,12 @@
   </section>
 
   <div id="mainContent" tabindex="-1"></div>
+
+<!-- Straight to either end of a long screen. Shown on narrow screens only. -->
+<div id="ends" aria-hidden="false">
+  <button id="endTop" type="button" title="To the top" aria-label="Jump to the top">&#9650;</button>
+  <button id="endBottom" type="button" title="To the end" aria-label="Jump to the end">&#9660;</button>
+</div>
   <div id="zoom" aria-hidden="true"></div>
 
   <!-- ============ DRAFT ============ -->
@@ -5066,6 +5097,67 @@ $('btnDetails').onclick = function(){
   announce(S.showDetails ? 'Card details shown' : 'Card details hidden');
 };
 
+/* ---------------- jumping to the ends ----------------
+ *
+ * The pack is the thing worth jumping around: at one or two cards across it
+ * runs for several screens, and comparing the first card with the last means
+ * a lot of scrolling. Down goes to the end of whatever grid is on screen —
+ * the pack while drafting, the pool while building — rather than the bottom
+ * of the document, which is a footer nobody wants to visit. */
+
+function endsTarget(){
+  if (!$('viewDraft').classList.contains('hidden')) return $('packGrid');
+  if (!$('viewBuild').classList.contains('hidden')) return $('zoneArea');
+  if (!$('viewPlay').classList.contains('hidden')) return $('viewPlay');
+  return null;
+}
+
+/* Where "down" goes: the bottom of the grid, brought just above the fold
+ * rather than flush against it. Shared with the disabled state, so the arrow
+ * greys out exactly when pressing it would do nothing. */
+function endsBottomY(){
+  var grid = endsTarget();
+  var max = document.documentElement.scrollHeight - window.innerHeight;
+  if (!grid) return max;
+  var r = grid.getBoundingClientRect();
+  return Math.max(0, Math.min(max, window.scrollY + r.bottom - window.innerHeight + 24));
+}
+
+function jumpToEnd(down){
+  var smooth = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var behavior = smooth ? 'smooth' : 'auto';
+  window.scrollTo({ top: down ? endsBottomY() : 0, behavior: behavior });
+}
+
+/* Worth showing at all? Only on a narrow screen, and only when there is
+ * enough below the fold that scrolling by hand is a chore. */
+function endsBlocked(){
+  // Anything modal owns the screen while it is up.
+  var over = $('storyOver'), sheet = $('sheetBack'), rules = $('rulesPanel'), lib = $('libPanel');
+  if (over && !over.classList.contains('hidden')) return true;
+  if (sheet && sheet.classList.contains('on')) return true;
+  if (rules && rules.classList.contains('on')) return true;
+  if (lib && !lib.classList.contains('hidden')) return true;
+  return false;
+}
+
+function refreshEnds(){
+  var narrow = window.innerWidth <= 700;
+  var tall = document.documentElement.scrollHeight > window.innerHeight * 1.6;
+  var show = narrow && tall && !endsBlocked();
+  $('ends').classList.toggle('on', show);
+  if (!show) return;
+  $('endTop').disabled = window.scrollY < 40;
+  $('endBottom').disabled = Math.abs(window.scrollY - endsBottomY()) < 40;
+}
+
+$('endTop').onclick = function(){ jumpToEnd(false); };
+$('endBottom').onclick = function(){ jumpToEnd(true); };
+window.addEventListener('scroll', refreshEnds, { passive: true });
+window.addEventListener('resize', refreshEnds);
+// Content changes as much as scrolling does, so check after a render settles.
+setInterval(refreshEnds, 700);
+
 $('cardSmaller').onclick = function(){ stepCard(-1); };
 $('cardBigger').onclick  = function(){ stepCard(1); };
 
@@ -7209,20 +7301,48 @@ function rollChaosPacks(){
 
   if (!spin.length) { announce('All three packs are pinned — nothing to roll.'); return; }
 
-  // Reduced motion, or no animation wanted: the same result, immediately.
+  /* Reduced motion still gets a sequence, just not a spin.
+   *
+   * Skipping straight to the answer was the wrong reading of the request:
+   * "reduce motion" asks for nothing flying about, not for the result to be
+   * withheld. Windows turns this on whenever "show animations" is off, which
+   * is common, and the effect was that a whole machine never saw the reels do
+   * anything at all. So the reels still land one at a time — they simply
+   * appear rather than blur and roll. */
   var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (still) { spin.forEach(settle); done(); return; }
 
   CHAOS_ROLLING = true;
   $('btnChaosRoll').disabled = true;
   $('btnChaosRoll').textContent = 'Rolling…';
+
+  /* Clear last roll's landing state first, on either path. Re-adding a class
+   * that is already there changes nothing and replays no animation, so
+   * without this a second roll landed silently. */
   spin.forEach(function(i){
     var el = $('chaosReel' + i);
-    if (el){ el.classList.remove('settled'); el.classList.add('spinning'); }
+    if (el) el.classList.remove('settled');
   });
 
+  if (still) {
+    spin.forEach(function(i, n){
+      setTimeout(function(){
+        settle(i);
+        if (n === spin.length - 1) done();
+      }, 260 * n);
+    });
+    return;
+  }
+
+  spin.forEach(function(i){
+    var el = $('chaosReel' + i);
+    if (el) el.classList.add('spinning');
+  });
+
+  /* Slower than it was. The first version settled the last reel inside a
+   * second and a half, which on a big screen went by before you had looked
+   * at it. Roughly two and a half seconds, with a clear beat between reels. */
   var stopAt = {};
-  spin.forEach(function(i, n){ stopAt[i] = 620 + n * 460; });
+  spin.forEach(function(i, n){ stopAt[i] = 1050 + n * 640; });
   var started = Date.now(), left = spin.slice();
   var tick = setInterval(function(){
     var t = Date.now() - started;
@@ -7234,7 +7354,7 @@ function rollChaosPacks(){
       return true;
     });
     if (!left.length) { clearInterval(tick); done(); }
-  }, 80);
+  }, 95);
 }
 
 $('btnChaosRoll').onclick = rollChaosPacks;
