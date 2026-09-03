@@ -55,9 +55,17 @@
 
   /* Visible keyboard focus everywhere, not just where the browser bothers. */
   :focus-visible{outline:3px solid var(--gold2); outline-offset:2px; border-radius:4px}
+  /* The system preference is the default, not a verdict. Asking for full
+     motion here is an explicit choice by the person looking at the screen,
+     so it outranks it — hence every rule below is scoped to "unless you
+     asked for motion". */
   @media (prefers-reduced-motion: reduce){
-    *,*::before,*::after{animation-duration:.001ms !important; transition-duration:.001ms !important}
-    .mtgcard:hover{transform:none !important}
+    html:not([data-motion="full"]) *,
+    html:not([data-motion="full"]) *::before,
+    html:not([data-motion="full"]) *::after{
+      animation-duration:.001ms !important; transition-duration:.001ms !important
+    }
+    html:not([data-motion="full"]) .mtgcard:hover{transform:none !important}
   }
   .sr-only{
     position:absolute; width:1px; height:1px; padding:0; margin:-1px;
@@ -831,6 +839,8 @@
             title="Show the bot's power rating and the special-treatment badges on each card">Show details</button>
     <button id="btnOracle" class="btn sm" aria-pressed="true"
             title="Show oracle text under the card preview when you hover">Oracle text</button>
+    <button id="btnMotion" class="btn sm" aria-pressed="false"
+            title="Play the reels and other animations even if your system asks for reduced motion">Motion</button>
     <div class="sizer" role="group" aria-label="Card size">
       <span class="sizer-label" aria-hidden="true">Cards</span>
       <button id="cardSmaller" class="btn sm" aria-label="Make cards smaller">&minus;</button>
@@ -5097,6 +5107,67 @@ $('btnDetails').onclick = function(){
   announce(S.showDetails ? 'Card details shown' : 'Card details hidden');
 };
 
+/* ---------------- motion ----------------
+ *
+ * Whether animations play. The system preference is the default, but it is
+ * only a default: Windows reports "reduce" whenever "show animations" is
+ * switched off, which plenty of people do for reasons that have nothing to
+ * do with wanting a spinning reel to hold still. So this can be turned on
+ * here, the choice is remembered, and everything that moves asks this one
+ * question rather than the media query directly. */
+
+var MOTION_KEY = 'motion:full';
+
+function systemReducesMotion(){
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+function motionForced(){
+  return document.documentElement.getAttribute('data-motion') === 'full';
+}
+// The one question anything animated should ask.
+function motionOK(){
+  return motionForced() || !systemReducesMotion();
+}
+
+function applyMotion(full){
+  var root = document.documentElement;
+  if (full) root.setAttribute('data-motion', 'full');
+  else root.removeAttribute('data-motion');
+  var b = $('btnMotion');
+  b.setAttribute('aria-pressed', full ? 'true' : 'false');
+  /* Say what is actually happening, which is not the same as what the button
+   * does: with animations already on system-wide there is nothing to force. */
+  b.textContent = full ? 'Motion: full'
+    : (systemReducesMotion() ? 'Motion: reduced' : 'Motion: system');
+  try { localStorage.setItem(MOTION_KEY, full ? '1' : '0'); } catch (e) {}
+  updateRollHint();
+}
+
+$('btnMotion').onclick = function(){
+  var next = !motionForced();
+  applyMotion(next);
+  announce(next ? 'Animations on' : (systemReducesMotion()
+    ? 'Following your system setting: animations reduced' : 'Following your system setting'));
+};
+
+/* Point at the switch from where the reels are, since that is where anyone
+ * would notice them not moving. */
+function updateRollHint(){
+  var el = $('chaosRollHint');
+  if (!el) return;
+  var base = 'Any pack you have pinned below stays where it is; the rest are rolled.';
+  el.innerHTML = (systemReducesMotion() && !motionForced())
+    ? base + ' <b>Your system asks for reduced motion, so the reels land without spinning</b> — ' +
+      'press <b>Motion</b> in the header for the full roll.'
+    : base;
+}
+
+(function(){
+  var saved = null;
+  try { saved = localStorage.getItem(MOTION_KEY); } catch (e) {}
+  applyMotion(saved === '1');
+}());
+
 /* ---------------- jumping to the ends ----------------
  *
  * The pack is the thing worth jumping around: at one or two cards across it
@@ -5124,8 +5195,7 @@ function endsBottomY(){
 }
 
 function jumpToEnd(down){
-  var smooth = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  var behavior = smooth ? 'smooth' : 'auto';
+  var behavior = motionOK() ? 'smooth' : 'auto';
   window.scrollTo({ top: down ? endsBottomY() : 0, behavior: behavior });
 }
 
@@ -7309,7 +7379,7 @@ function rollChaosPacks(){
    * is common, and the effect was that a whole machine never saw the reels do
    * anything at all. So the reels still land one at a time — they simply
    * appear rather than blur and roll. */
-  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var still = !motionOK();
 
   CHAOS_ROLLING = true;
   $('btnChaosRoll').disabled = true;
