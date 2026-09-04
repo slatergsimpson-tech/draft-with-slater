@@ -5077,9 +5077,13 @@ var CARD_SIZES = [
 ];
 /* Large by default, because the hover preview covers reading the text. On a
  * phone there is no hover and far less room, so start smaller — holding a
- * card opens the full sheet, which is a better read than any thumbnail. */
+ * card opens the full sheet, which is a better read than any thumbnail.
+ *
+ * Medium rather than small on a phone: S was a size nobody stayed on. Two
+ * cards still fit across a portrait screen at M, and the art is finally big
+ * enough to tell two commons apart without opening either of them. */
 var cardSizeIdx = (function(){
-  try { return window.innerWidth < 720 ? 1 : 3; } catch (e) { return 3; }
+  try { return window.innerWidth < 720 ? 2 : 3; } catch (e) { return 3; }
 }());
 
 function announce(msg){ $('a11yStatus').textContent = msg; }
