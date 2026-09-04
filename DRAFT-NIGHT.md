@@ -515,9 +515,13 @@ Render only if you also want to draft *with friends* while the computer is off.
 **What is Chaos Draft?** The mode the app opens on, and the one most worth
 your time. Three packs, eight players, one pod — but every pack can come from
 a different corner of thirty years. Pull the handle, watch three reels of set
-symbols settle, and draft whatever they land on. Open **Pin a pack** if you
-want to fix one of the three to a set you have been meaning to try, or narrow
-a slot to an era; whatever you pin is left alone and the rest are rolled.
+symbols settle, and draft whatever they land on. The order they landed in is
+not fixed: **drag a reel sideways** to move a pack, because opening a set
+first is not the same as opening it last — pack one sets the tone and pack
+three decides what your deck ends up being. (Arrow keys move a reel too.)
+Open **Pin a pack** if you want to fix one of the three to a set you have been
+meaning to try, or narrow a slot to an era; whatever you pin is left alone and
+the rest are rolled.
 **Who opens what** decides whether the whole table shares a set each round or
 every seat opens its own — the second is the real thing.
 

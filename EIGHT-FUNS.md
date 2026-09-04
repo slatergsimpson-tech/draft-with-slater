@@ -217,6 +217,22 @@ remembers the table's usual settings, greets returning names, maybe a
   Alpha filling the other four — and the note under the menu says which sets
   it used and why. Verdict at next draft night.
 
+- [x] Agency: **the rolled packs can be rearranged** — 2026-09-04. The roll
+  landed three sets and you were stuck with the order it dealt them in, which
+  threw away a decision as large as which sets you got: pack one sets the tone
+  of the draft and pack three decides what the deck actually becomes. Choosing
+  that order was much of the point of *Pack It Up*, and it had quietly not
+  survived the move to chaos. A reel can now be dragged sideways into another
+  position, and the whole slot travels with it — the set, whether it is
+  pinned, its filter box and its "Rolled X" note, because all of those belong
+  to the pack rather than to the position. Pointer events rather than HTML5
+  drag-and-drop, which has never worked on a touchscreen; `touch-action:pan-y`
+  leaves a vertical swipe to the page, so only a sideways drag is a rearrange
+  and scrolling a phone still scrolls. The reels renumber themselves as you
+  drag, so the preview says what you would actually get, and the arrow keys do
+  the same move without a pointer. Measured end to end: reorder, then start —
+  the draft opens the pack that is now first. Verdict at next draft night.
+
 - [x] Flow: **era first, then set** — 2026-08-14. The setup screen was one
   long configuration form; it now asks the question this app exists to ask.
   Step one is a shelf of six era cards, each with its years, a line about

@@ -749,6 +749,20 @@
   .reel.pinned{border-color:var(--line2); box-shadow:inset 0 0 0 1px var(--line)}
   .reel .pin{position:absolute; top:6px; right:8px; font-size:9.5px; letter-spacing:.7px;
              text-transform:uppercase; color:var(--ink3)}
+  /* Rearranging the three packs.
+     Which set you open first is not decoration: pack one sets the tone and
+     the last pack decides what the deck turns into. So the order is draggable
+     by hand. touch-action:pan-y leaves a vertical swipe to the page — only a
+     sideways drag belongs to us, which is what makes this work on a phone. */
+  .reel{cursor:grab; touch-action:pan-y; -webkit-user-select:none; user-select:none}
+  .reel.grabbed{cursor:grabbing; z-index:4; transition:none; border-color:var(--gold);
+                box-shadow:0 8px 22px rgba(0,0,0,.45)}
+  /* The reels that are not being dragged step aside using the transform
+     transition .reel already carries, so no extra class is needed. */
+  .slotreels.reordering .reel:not(.grabbed){opacity:.72}
+  /* Which pack this is. Only worth saying out loud once the order can move. */
+  .reel .ord{position:absolute; top:6px; left:8px; font-size:9.5px; letter-spacing:.7px;
+             text-transform:uppercase; color:var(--ink3)}
   .slotpull{width:100%; font-size:15px; padding:12px 18px}
   .slothint{margin-top:9px}
   @media(max-width:560px){
@@ -1076,10 +1090,11 @@
 
         <!-- The roll. Three reels of set symbols, settling one at a time. -->
         <div class="slot">
-          <div class="slotreels" id="chaosReels"></div>
+          <div class="slotreels" id="chaosReels" role="list"></div>
           <button id="btnChaosRoll" class="btn primary slotpull">Roll the packs</button>
           <div class="hint slothint" id="chaosRollHint">
             Any pack you have pinned below stays where it is; the rest are rolled.
+            Drag a reel sideways to change the order the packs are opened in.
           </div>
         </div>
 
@@ -5159,7 +5174,8 @@ $('btnMotion').onclick = function(){
 function updateRollHint(){
   var el = $('chaosRollHint');
   if (!el) return;
-  var base = 'Any pack you have pinned below stays where it is; the rest are rolled.';
+  var base = 'Any pack you have pinned below stays where it is; the rest are rolled. ' +
+    'Drag a reel sideways to change the order the packs are opened in.';
   el.innerHTML = (systemReducesMotion() && !motionForced())
     ? base + ' <b>Your system asks for reduced motion, so the reels land without spinning</b> — ' +
       'press <b>Motion</b> in the header for the full roll.'
@@ -7152,6 +7168,9 @@ function renderChaosSlots(){
     sel.onchange = function(){
       S.chaosSlots[i] = sel.value;
       S.chaosPinned[i] = sel.value.indexOf('random') !== 0;
+      // The note under the box records a roll. Choosing a set by hand is not
+      // one, and leaving the old line there claims a set you just replaced.
+      $('chaosRolled' + i).textContent = '';
       $('chaosPreview').classList.add('hidden');
       $('chaosPreview').classList.remove('err');
       updateChaosHint();
@@ -7292,9 +7311,12 @@ function chaosSlotPinned(i){
   return !!S.chaosPinned[i] && !!v && v.indexOf('random') !== 0;
 }
 
-function chaosReelFace(set, pinned){
-  if (!set) return '<span class="reelblank">&#9679;&#9679;&#9679;</span>';
-  return (pinned ? '<span class="pin">pinned</span>' : '') +
+/* The pack number lives inside the face because the face is rewritten on
+ * every frame of a spin; anything outside it would vanish mid-roll. */
+function chaosReelFace(set, pinned, i){
+  var ord = '<span class="ord">Pack ' + (i + 1) + '</span>';
+  if (!set) return ord + '<span class="reelblank">&#9679;&#9679;&#9679;</span>';
+  return ord + (pinned ? '<span class="pin">pinned</span>' : '') +
     (set.icon_svg_uri ? '<img class="sicon" src="' + esc(set.icon_svg_uri) + '" alt="">' : '') +
     '<b>' + esc((set.code || '').toUpperCase()) + '</b>' +
     '<i>' + esc(set.name || '') + '</i>' +
@@ -7310,10 +7332,209 @@ function renderChaosReels(){
     var code = S.chaosSlots[i];
     var set = (code && code.indexOf('random') !== 0) ? chaosSetByCode(code) : null;
     return '<div class="reel' + (pinned ? ' pinned' : '') + '" id="chaosReel' + i + '" ' +
-      'role="img" aria-label="Pack ' + (i + 1) + ': ' +
-      esc(set ? set.name : 'not rolled yet') + '">' +
-      chaosReelFace(set, pinned) + '</div>';
+      'data-slot="' + i + '" tabindex="0" role="listitem" ' +
+      'aria-roledescription="draggable pack" ' +
+      'aria-label="' + esc(chaosReelLabel(i, set ? set.name : 'not rolled yet')) + '" ' +
+      'title="Drag to change the order of the packs">' +
+      chaosReelFace(set, pinned, i) + '</div>';
   }).join('');
+  [0, 1, 2].forEach(function(i){
+    var el = $('chaosReel' + i);
+    if (!el) return;
+    el.addEventListener('pointerdown', reelDown);
+    el.addEventListener('keydown', reelKey);
+  });
+}
+
+/* ---------------- rearranging the packs ----------------
+ *
+ * The order the three packs are opened in is a real decision, not a cosmetic
+ * one: pack one sets the tone of the draft and pack three decides what the
+ * deck actually becomes. Rolling three sets and being stuck with the order
+ * they landed in throws that decision away — choosing it was much of the
+ * point of Pack It Up, and it survives the move to chaos.
+ *
+ * So a reel can be picked up and dropped somewhere else. Pointer events, not
+ * HTML5 drag-and-drop, because that has never worked on a touchscreen. What
+ * moves is the whole slot: the set, whether it is pinned, its filter box and
+ * its "Rolled X" note all belong to the pack, not to the position.
+ */
+
+function chaosReelLabel(i, name){
+  return 'Pack ' + (i + 1) + ': ' + name +
+    '. Drag it, or press the left and right arrow keys, to change the order.';
+}
+
+/* What to call a slot out loud: the set if it holds one, otherwise whatever
+ * kind of random it is still set to. */
+function chaosSlotLabel(i){
+  var v = S.chaosSlots[i];
+  var set = (v && v.indexOf('random') !== 0) ? chaosSetByCode(v) : null;
+  if (set) return set.name;
+  var r = RANDOM_CHOICES.filter(function(o){ return o.value === v; })[0];
+  return r ? r.label : 'random';
+}
+
+/* Move the pack at `from` into position `to`, carrying everything that
+ * belongs to it. Everything downstream reads S.chaosSlots in order, so this
+ * is a change to the draft and not merely to the picture. */
+function chaosMove(from, to){
+  if (from === to) return;
+  var snap = [0, 1, 2].map(function(i){
+    var f = $('chaosFilter' + i), n = $('chaosRolled' + i);
+    return {
+      slot: S.chaosSlots[i], pinned: !!S.chaosPinned[i],
+      filter: f ? f.value : '', note: n ? n.textContent : ''
+    };
+  });
+  snap.splice(to, 0, snap.splice(from, 1)[0]);
+  snap.forEach(function(s, i){ S.chaosSlots[i] = s.slot; S.chaosPinned[i] = s.pinned; });
+
+  /* The pin panel is rebuilt from S, which empties the filter boxes and the
+   * roll notes. Put them back where their pack went, or a filtered slot
+   * silently loses its filter the moment you rearrange. */
+  renderChaosSlots();
+  snap.forEach(function(s, i){
+    var f = $('chaosFilter' + i), sel = $('chaosSlot' + i), n = $('chaosRolled' + i);
+    if (f && sel && s.filter) {
+      f.value = s.filter;
+      sel.innerHTML = chaosOptionsHTML(s.slot, s.filter);
+      sel.value = s.slot;
+    }
+    if (n) n.textContent = s.note;
+  });
+
+  /* A preview drawn from the old order is now describing a draft you are not
+   * about to play. The table sheet redraws itself from the seed, so it stays
+   * honest on its own. */
+  $('chaosPreview').classList.add('hidden');
+  $('chaosPreview').classList.remove('err');
+
+  announce('Moved to pack ' + (to + 1) + '. Order is now ' +
+    [0, 1, 2].map(function(i){ return chaosSlotLabel(i); }).join(', then ') + '.');
+}
+
+var REEL_DRAG = null;
+
+function reelDown(e){
+  if (CHAOS_ROLLING) return;                    // let the reels finish landing first
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  var el = e.currentTarget;
+  var els = [0, 1, 2].map(function(i){ return $('chaosReel' + i); });
+  if (els.some(function(x){ return !x; })) return;
+  var rects = els.map(function(x){ return x.getBoundingClientRect(); });
+  var i = +el.getAttribute('data-slot');
+  REEL_DRAG = {
+    i: i, to: i, el: el, id: e.pointerId, x: e.clientX, y: e.clientY, els: els,
+    lefts: rects.map(function(r){ return r.left; }),
+    centers: rects.map(function(r){ return r.left + r.width / 2; }),
+    live: false
+  };
+  /* On the window, not the reel: the pointer leaves the reel almost at once,
+   * and a listener on the element itself stops hearing about the drag the
+   * moment it does. That is exactly how the first version failed. */
+  window.addEventListener('pointermove', reelMove);
+  window.addEventListener('pointerup', reelUp);
+  window.addEventListener('pointercancel', reelCancel);
+}
+
+/* Where the dragged reel would land if you let go now: whichever slot its own
+ * centre is nearest, rather than where the finger is, so a reel picked up
+ * near its edge does not jump a place the instant it moves. */
+function reelTargetFor(d, clientX){
+  var mid = d.centers[d.i] + (clientX - d.x);
+  var best = 0, dist = Infinity;
+  d.centers.forEach(function(c, k){
+    var gap = Math.abs(c - mid);
+    if (gap < dist) { dist = gap; best = k; }
+  });
+  return best;
+}
+
+// Show the order you would get, by sliding the other reels out of the way.
+function reelPreview(d){
+  var order = [0, 1, 2].filter(function(k){ return k !== d.i; });
+  order.splice(d.to, 0, d.i);
+  d.els.forEach(function(el, k){
+    var pos = order.indexOf(k);
+    /* Renumber as it goes: a reel that has visibly moved into third place
+     * while still calling itself Pack 1 is the preview contradicting itself. */
+    var ord = el.querySelector('.ord');
+    if (ord) ord.textContent = 'Pack ' + (pos + 1);
+    if (k === d.i) return;              // the dragged one follows the pointer, not the grid
+    el.style.transform = 'translateX(' + (d.lefts[pos] - d.lefts[k]) + 'px)';
+  });
+}
+
+function reelMove(e){
+  var d = REEL_DRAG;
+  if (!d || e.pointerId !== d.id) return;
+  var dx = e.clientX - d.x, dy = e.clientY - d.y;
+  if (!d.live) {
+    /* Sideways is a rearrange; downwards is the page scrolling, and on a
+     * phone that has to stay the page scrolling. Both gestures arrive here
+     * because touch-action is pan-y, so the difference is decided here. */
+    if (Math.abs(dx) < 8 || Math.abs(dx) <= Math.abs(dy)) return;
+    d.live = true;
+    d.el.classList.remove('settled');
+    d.el.classList.add('grabbed');
+    $('chaosReels').classList.add('reordering');
+    try { d.el.setPointerCapture(d.id); } catch (err) {}
+  }
+  e.preventDefault();
+  d.el.style.transform = 'translateX(' + dx + 'px)';
+  var to = reelTargetFor(d, e.clientX);
+  if (to !== d.to) { d.to = to; reelPreview(d); }
+}
+
+function reelRelease(d){
+  window.removeEventListener('pointermove', reelMove);
+  window.removeEventListener('pointerup', reelUp);
+  window.removeEventListener('pointercancel', reelCancel);
+  try { d.el.releasePointerCapture(d.id); } catch (err) {}
+  $('chaosReels').classList.remove('reordering');
+  d.els.forEach(function(el){
+    if (!el) return;
+    el.classList.remove('grabbed');
+    el.style.transform = '';
+  });
+  REEL_DRAG = null;
+}
+
+function reelUp(e){
+  var d = REEL_DRAG;
+  if (!d || e.pointerId !== d.id) return;
+  var live = d.live, from = d.i, to = d.to;
+  reelRelease(d);
+  if (!live) return;                  // that was a click, and clicking a reel does nothing
+  e.preventDefault();
+  /* Redraw either way: the reels are still carrying the inline transforms the
+   * preview put on them, and a redraw is what clears them. */
+  if (from !== to) chaosMove(from, to);
+  else renderChaosReels();
+}
+
+function reelCancel(e){
+  var d = REEL_DRAG;
+  if (!d || e.pointerId !== d.id) return;
+  reelRelease(d);
+  renderChaosReels();
+}
+
+/* The same move without a pointer. A reel is focusable and the arrow keys
+ * shift it one place, so the drag is the discoverable way to do this rather
+ * than the only way. */
+function reelKey(e){
+  if (CHAOS_ROLLING) return;
+  var i = +e.currentTarget.getAttribute('data-slot');
+  var to = null;
+  if (e.key === 'ArrowLeft' && i > 0) to = i - 1;
+  else if (e.key === 'ArrowRight' && i < 2) to = i + 1;
+  else return;
+  e.preventDefault();
+  chaosMove(i, to);
+  var moved = $('chaosReel' + to);     // the move rebuilt the reels, so focus follows the pack
+  if (moved) moved.focus();
 }
 
 function rollChaosPacks(){
@@ -7345,10 +7566,10 @@ function rollChaosPacks(){
     S.chaosPinned[i] = false;
     var el = $('chaosReel' + i);
     if (el){
-      el.innerHTML = chaosReelFace(r.set, false);
+      el.innerHTML = chaosReelFace(r.set, false, i);
       el.classList.remove('spinning');
       el.classList.add('settled');
-      el.setAttribute('aria-label', 'Pack ' + (i + 1) + ': ' + r.set.name);
+      el.setAttribute('aria-label', chaosReelLabel(i, r.set.name));
     }
     var sel = $('chaosSlot' + i), filt = $('chaosFilter' + i);
     if (sel){
@@ -7424,7 +7645,7 @@ function rollChaosPacks(){
       if (t >= stopAt[i]) { settle(i); return false; }
       var el = $('chaosReel' + i);
       var pool = results[i].pool;
-      if (el) el.innerHTML = chaosReelFace(pool[Math.floor(Math.random() * pool.length)], false);
+      if (el) el.innerHTML = chaosReelFace(pool[Math.floor(Math.random() * pool.length)], false, i);
       return true;
     });
     if (!left.length) { clearInterval(tick); done(); }
