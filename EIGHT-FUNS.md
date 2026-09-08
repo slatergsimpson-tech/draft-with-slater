@@ -324,6 +324,17 @@ remembers the table's usual settings, greets returning names, maybe a
   is the wrong default: a picture reaches a group chat by being pasted into
   it, not by being found in a folder. Download stays, Share appears where the
   browser will take a file.
+  *And once he shared one:* **the deck gets a name.** "My first one just took
+  the colour name Dimir and I could not change that on the display" — which
+  is the whole diagnosis in one sentence. The guild sat in the corner in gold
+  and was the only proper noun on the picture, so it read as the deck's name,
+  and there was no way to argue with it. Naming is now the headline: type a
+  name and it takes the title, the set steps down to the line beneath, and
+  the file is called after the deck rather than after the set. Unnamed, the
+  set stays the title, which is the only sensible thing to call a deck with
+  no name. Lesson worth keeping: a thing set large, in the accent colour, in
+  the top corner *is* a name, whatever you meant it to be — so either make it
+  one or put a real one in front of it.
   And a number got fixed on the way: the colour split counts spells now, not
   the whole deck. Counting seventeen basics made every deck ever built here
   come out about 43% colourless — a true figure that says nothing, drawn as a

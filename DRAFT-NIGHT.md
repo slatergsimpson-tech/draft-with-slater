@@ -554,7 +554,15 @@ with the pivot marked, the mana curve, the colour split, the set and the date.
 group chat, **Download** saves the PNG, and on a phone **Share** hands it to
 the usual share sheet.
 
-**Tags** are the part you write. The app opens with a guess from your deck —
+**Name the deck** in the box under the picture and the name becomes the
+headline, with the set stepping down to the line beneath it. Leave it empty
+and the set stays the title, which is the only sensible thing to call an
+unnamed deck. The name is also what the downloaded file is called, so
+*Mice and Mayhem* saves as `draft-mice-and-mayhem-20260908.png` rather than
+as the set you happened to draft. The guild in the gold corner is your colour
+pair, not the deck's name.
+
+**Tags** are the other part you write. The app opens with a guess from your deck —
 its speed, whether it is full of artifacts or spells, and a creature type if
 you drafted enough of them to mean it — and every word of it can be thrown
 away. Tap a tag to remove it, tap a suggestion to add it, or type your own:

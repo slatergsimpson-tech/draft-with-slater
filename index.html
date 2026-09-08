@@ -635,9 +635,13 @@
   .shotbox{max-width:780px}
   .shotcanvas{width:100%; height:auto; display:block; border-radius:10px;
               border:1px solid var(--line); margin-top:6px}
+  /* The name box is set in the display face at the size it will be drawn, so
+     typing into it looks like typing on the picture. */
+  .shotname{margin-top:12px}
+  .shotname input{width:100%; font-family:var(--font); font-size:18px; padding:9px 12px}
   /* Tag editing. Chips already on the picture read gold; the suggestions
      underneath are quieter, so it is obvious which ones are in. */
-  .shottags{margin-top:12px}
+  .shottags{margin-top:10px}
   .tagchips{display:flex; flex-wrap:wrap; gap:7px}
   .tagchips:empty{display:none}
   .tagchip{display:inline-flex; align-items:center; gap:8px; cursor:pointer;
@@ -1521,6 +1525,11 @@
         <button class="btn sm" id="btnShotClose">Close</button>
       </div>
       <canvas id="shotCanvas" class="shotcanvas"></canvas>
+      <div class="shotname">
+        <label class="sr-only" for="shotNameInput">Deck name</label>
+        <input id="shotNameInput" type="text" maxlength="40" autocomplete="off"
+               placeholder="Name this deck">
+      </div>
       <div class="shottags">
         <div class="tagchips" id="shotChips"></div>
         <div class="tagadd">
@@ -6586,7 +6595,7 @@ function wireGuestSide(conn){
     MP.started = true;
     MP.seat = N.seatOf(MP.table, MP.me);
     MP.log = [];
-    S.story = null; S.shotTags = null;
+    S.story = null; S.shotTags = null; S.deckName = null;
     MP.winstonGuest = msg.mode === 'winston';
     MP.wremote = null;
     S.wNote = '';
@@ -8264,7 +8273,7 @@ function startPlay(seedOverride){
   S.spellTarget = rules.commander ? 40 : 23;
   // A fresh draft gets a fresh story; sealed never writes one. The guest
   // diary is cleared too, so a table you left cannot narrate a solo draft.
-  S.story = null; S.shotTags = null;
+  S.story = null; S.shotTags = null; S.deckName = null;
   S.pileScroll = 0;
   /* A new draft is a new set of worlds, so the basics have to be worked out
    * again. Without this the lands kept whatever art the last draft chose —
@@ -10317,8 +10326,19 @@ function drawShareShot(canvas){
     sw -= 32;
   });
 
+  /* The deck's name is the headline, and the set steps down to the line
+   * underneath it. Until it has one the set is the headline, which is the
+   * only sensible thing to call an unnamed deck.
+   *
+   * This is worth the rearranging: the guild in the corner was reading as
+   * the deck's name — it is the only proper noun on the picture and it is
+   * set in gold — so a deck came out called "Dimir" and there was no way to
+   * argue with it. A real name up front settles what the corner is for. */
+  var deckName = String(S.deckName || '').trim();
+  var setName = (S.chosen && S.chosen.name) || 'A draft';
+
   ctx.textAlign = 'left';
-  var title = (S.chosen && S.chosen.name) || 'A draft';
+  var title = deckName || setName;
   var ts = shotFit(ctx, title, SHOT_W - PAD * 2 - 400, '600', 36, SHOT_SERIF, 19);
   ctx.font = '600 ' + ts + 'px ' + SHOT_SERIF;
   ctx.fillStyle = SHOT.ink;
@@ -10326,7 +10346,8 @@ function drawShareShot(canvas){
 
   ctx.font = '500 15px ' + SHOT_SANS;
   ctx.fillStyle = SHOT.ink3;
-  ctx.fillText(story.hist.length + ' picks · ' + shotDate(), PAD, 126);
+  ctx.fillText((deckName ? setName + ' · ' : '') +
+    story.hist.length + ' picks · ' + shotDate(), PAD, 126);
 
   // --- the tags -------------------------------------------------------
   /* The canvas is a fixed size whether or not there are any, so an untagged
@@ -10377,7 +10398,8 @@ function drawShareShot(canvas){
  * "chaos", which makes every one of them the same file in a downloads folder,
  * and "bloomburrow" is a better thing to find later than "blb". */
 function shotFilename(){
-  var name = (S.chosen && (S.chosen.name || S.chosen.code)) || '';
+  var name = String(S.deckName || '').trim() ||
+    (S.chosen && (S.chosen.name || S.chosen.code)) || '';
   var slug = String(name).toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 44)
     .replace(/-+$/, '');
@@ -10530,6 +10552,7 @@ function openShot(){
   $('shotNote').textContent = subject.built
     ? 'No card names and no seed, so it says what you built without giving the next drafter the table.'
     : 'Your picks so far — build the deck first for the curve and colours to mean more.';
+  $('shotNameInput').value = S.deckName || '';
   renderShotTags();
 
   /* Copy leads: pasting a picture into a conversation is the whole point, and
@@ -10557,6 +10580,25 @@ $('btnShotClose').onclick = closeShot;
 $('btnShotCopy').onclick = shotCopy;
 $('btnShotShare').onclick = shotShare;
 $('btnShotSave').onclick = shotSave;
+/* Typing the name redraws the picture, on a short delay. Every keystroke
+ * would repaint 2400x1350 and lag the typing on a phone; waiting for a pause
+ * makes the title appear a beat after you stop, which reads as the picture
+ * catching up rather than as the box being slow. */
+var shotNameTimer = null;
+$('shotNameInput').addEventListener('input', function(){
+  S.deckName = $('shotNameInput').value;
+  clearTimeout(shotNameTimer);
+  shotNameTimer = setTimeout(function(){ drawShareShot($('shotCanvas')); }, 180);
+});
+// Enter means "done naming", not "submit the dialog".
+$('shotNameInput').addEventListener('keydown', function(e){
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  clearTimeout(shotNameTimer);
+  drawShareShot($('shotCanvas'));
+  $('shotNameInput').blur();
+});
+
 $('btnShotTagAdd').onclick = function(){ addShotTag($('shotTagInput').value); };
 $('shotTagInput').addEventListener('keydown', function(e){
   if (e.key !== 'Enter') return;
