@@ -547,6 +547,20 @@ and promos are skipped where the set has an ordinary printing to use instead,
 unless — like Unfinity — the special treatment is all the set has. The line
 under the menu says exactly which sets it used and why.
 
+**How do I show someone a deck I liked?** Press **Share image** on the deck
+screen. It draws your draft as one picture — the colour journey with the
+pivot marked, the mana curve, the colour split, the set and the date — and on
+a phone it goes straight to the share sheet, so it can be in the group chat in
+two taps. On a computer it saves as a PNG.
+
+There are deliberately **no card names on it, and no seed**. A decklist tells
+whoever reads it what was in the packs, and a seed hands them the whole draft;
+the shape tells them what you *built*, which is the interesting part and the
+part a picture is good at — nobody reads a forty-card list in a group chat.
+Build the deck first: before that the picture is your picks so far, and says
+so. Sealed has no picture, for the same reason it has no draft story — there
+were no picks to remember.
+
 **Where do I get a cube?** The cube tab opens on **Find a cube**. The official
 cubes — Vintage, Legacy, Modern, Arena and the rest of the ones Wizards runs —
 load in one click, and their lists come from Scryfall, so they are current

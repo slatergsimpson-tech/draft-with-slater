@@ -579,6 +579,11 @@
     .librow .lacts .btn{min-height:36px}
     .chaostable table{font-size:11px}
     .chaostable th,.chaostable td{padding:4px 6px}
+    /* Give the share preview the width back. It is a 16:9 picture on a narrow
+       screen, so every pixel of padding costs it real size. Two classes
+       deep because .storybox sets the padding further down the sheet, and
+       source order would otherwise win. */
+    .storybox.shotbox{padding:16px 12px}
     /* Piles scroll sideways rather than squeezing to nothing. */
     .piles{gap:8px}
     footer{padding:18px 12px 40px}
@@ -625,6 +630,11 @@
   .storylede b{color:var(--gold2); font-weight:600}
   .storysec{margin-top:22px}
   .storysec h3{font-size:15px; margin-bottom:4px}
+  /* The share image, previewed at whatever width the box allows. Shown before
+     saving so nobody sends a picture they have not seen. */
+  .shotbox{max-width:780px}
+  .shotcanvas{width:100%; height:auto; display:block; border-radius:10px;
+              border:1px solid var(--line); margin-top:6px}
   .storysec .sub{font-size:12px; color:var(--ink3); margin-bottom:10px}
   .storychart{width:100%; height:auto; display:block; background:var(--bg2); border:1px solid var(--line); border-radius:10px}
   .storylegend{display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; font-size:12px; color:var(--ink2)}
@@ -1323,6 +1333,7 @@
       <button class="btn sm" id="btnClear">Clear deck</button>
       <button class="btn sm" id="btnPlaytest">Playtest</button>
       <button class="btn sm hidden" id="btnStory">Draft story</button>
+      <button class="btn sm hidden" id="btnShareImg">Share image</button>
     </div>
 
     <div id="cmdrZone" class="zone hidden">
@@ -1479,6 +1490,26 @@
       <div id="storyBody"></div>
       <div class="storyfoot">
         <button class="btn primary" id="btnStoryDone" style="flex:1">On to the deck</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- The deck as a picture. Shape only — the journey, the curve, the
+       colours — so it can go in the group chat without handing the next
+       drafter the table. -->
+  <div id="shotBack" class="storyback hidden"></div>
+  <div id="shotOver" class="storyover hidden" role="dialog" aria-modal="true" aria-labelledby="shotTitle">
+    <div class="storybox shotbox">
+      <div class="storyhead">
+        <h2 id="shotTitle">Your draft, as a picture</h2>
+        <div class="storysub" id="shotSub"></div>
+        <div class="spacer"></div>
+        <button class="btn sm" id="btnShotClose">Close</button>
+      </div>
+      <canvas id="shotCanvas" class="shotcanvas"></canvas>
+      <div class="hint" id="shotNote"></div>
+      <div class="storyfoot">
+        <button class="btn primary" id="btnShotSave" style="flex:1">Save image</button>
       </div>
     </div>
   </div>
@@ -6534,7 +6565,7 @@ function wireGuestSide(conn){
     MP.wremote = null;
     S.wNote = '';
     S.winston = null;
-    $('btnStory').classList.add('hidden');
+    showStoryButtons(false);
     // The host's choice of set is the table's; a guest never picks one.
     if (msg.chosen) S.chosen = msg.chosen;
     if (msg.chosen && msg.chosen.code) loadPlayRatings([msg.chosen.code]);
@@ -8218,7 +8249,7 @@ function startPlay(seedOverride){
   MP.winstonGuest = false;
   S.wNote = '';
   MP.log = [];
-  $('btnStory').classList.add('hidden');
+  showStoryButtons(false);
 
   /* The room takes on the set being opened. Chaos draws from whichever set
    * the first pack comes from, which is also the one the land art follows. */
@@ -9382,7 +9413,7 @@ function renderBuild(){
   var tb = $('bTotal');
   tb.textContent = total;
   tb.className = 'count-badge ' + (total === S.deckTarget ? 'ok' : 'off');
-  $('btnStory').classList.toggle('hidden', !S.story);
+  showStoryButtons(!!S.story);
 
   renderLandPanel(spells, landTotal);
 
@@ -9859,9 +9890,17 @@ function closeStory(){
 
 /* Called at every path a finished draft takes into the deckbuilder. Sealed
  * never writes a diary, so it never has a story to tell. */
+/* The two post-draft buttons come and go together. Both are fed by the same
+ * pick diary, so a draft with no story to tell has no picture to draw either
+ * — which is why sealed, alone among the formats, shows neither. */
+function showStoryButtons(on){
+  $('btnStory').classList.toggle('hidden', !on);
+  $('btnShareImg').classList.toggle('hidden', !on);
+}
+
 function maybeShowStory(){
   S.story = buildStory();
-  $('btnStory').classList.toggle('hidden', !S.story);
+  showStoryButtons(!!S.story);
   if (S.story) openStory();
 }
 
@@ -9873,6 +9912,386 @@ $('storyOver').addEventListener('click', function(e){
 });
 document.addEventListener('keydown', function(e){
   if (e.key === 'Escape' && !$('storyOver').classList.contains('hidden')) closeStory();
+});
+
+/* ---------------- the deck as a picture ----------------
+ *
+ * The one thing in this app that was being done by hand: export the list,
+ * paste it into Archidekt, use its deck-image feature, post that. Four steps
+ * and another website, every time a draft was worth showing anyone.
+ *
+ * This draws the celebration the story already ends on — the colour journey,
+ * the curve, the colours — onto a canvas, and hands it to the phone's share
+ * sheet.
+ *
+ * Deliberately no card names, and deliberately no seed. A decklist tells the
+ * next person what is in the packs, and a seed tells them everything; a shape
+ * tells them what you built, which is the part worth showing. It is also the
+ * part a picture is actually good at — nobody reads a 40-card list in a group
+ * chat.
+ *
+ * The palette is the dark inks whatever theme the app is wearing, so the
+ * picture looks the same in everybody's chat rather than betraying which
+ * mode the drafter happened to be in. */
+
+var SHOT_W = 1200, SHOT_H = 675, SHOT_SCALE = 2;
+var SHOT = {
+  bg: '#17140f', panel: '#211b13', line: '#3b3122',
+  ink: '#f0e8d7', ink2: '#bcb09a', ink3: '#8b8069', gold: '#e8c95a'
+};
+var SHOT_SANS = '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+var SHOT_SERIF = '"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif';
+
+function shotPath(ctx, x, y, w, h, r){
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function shotPanel(ctx, x, y, w, h){
+  shotPath(ctx, x, y, w, h, 14);
+  ctx.fillStyle = SHOT.panel; ctx.fill();
+  ctx.strokeStyle = SHOT.line; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+/* Small uppercase labels, letter-spaced by hand.
+ *
+ * `ctx.letterSpacing` is recent enough that half the phones this runs on do
+ * not have it, and silently ignoring it would leave the labels looking
+ * cramped rather than broken — which is the kind of wrong nobody reports. */
+function shotTracked(ctx, text, x, y, px, colour, track){
+  ctx.font = '600 ' + px + 'px ' + SHOT_SANS;
+  ctx.fillStyle = colour;
+  ctx.textAlign = 'left';
+  var cx = x;
+  for (var i = 0; i < text.length; i++){
+    ctx.fillText(text[i], cx, y);
+    cx += ctx.measureText(text[i]).width + track;
+  }
+  return cx - track - x;
+}
+
+// Shrink a heading until it fits rather than letting it run off the picture.
+function shotFit(ctx, text, max, weight, px, family, floor){
+  var size = px;
+  while (size > (floor || 15)){
+    ctx.font = weight + ' ' + size + 'px ' + family;
+    if (ctx.measureText(text).width <= max) break;
+    size -= 1;
+  }
+  return size;
+}
+
+function shotDate(){
+  try {
+    return new Date().toLocaleDateString(undefined,
+      { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch (e) { return ''; }
+}
+
+/* The colour journey, drawn the way the story draws it: cumulative pips per
+ * colour, pack boundaries marked, the pivot called out. The maths is
+ * storyChartSVG's, in canvas terms. */
+function shotJourney(ctx, story, x, y, w, h){
+  var hist = story.hist, series = story.series, n = series.length;
+  var last = series[n - 1];
+  var shown = WUBRG.filter(function(c){ return last[c] > 0; });
+  if (!shown.length) return;
+  var maxY = Math.max.apply(null, shown.map(function(c){ return last[c]; }).concat([1]));
+  var L = x + 46, R = x + w - 22, T = y + 46, B = y + h - 54;
+  var px = function(i){ return L + (R - L) * (n === 1 ? 0 : i / (n - 1)); };
+  var py = function(v){ return B - (B - T) * (v / maxY); };
+
+  shotTracked(ctx, 'THE COLOUR JOURNEY', x + 24, y + 30, 12, SHOT.ink3, 2.4);
+
+  // Pack boundaries: the three chapters of a draft, unlabelled would be a
+  // line nobody could read.
+  ctx.save();
+  ctx.setLineDash([4, 6]);
+  ctx.lineWidth = 1.5;
+  for (var i = 1; i < n; i++){
+    if (hist[i].round === hist[i - 1].round) continue;
+    ctx.strokeStyle = SHOT.line;
+    ctx.beginPath(); ctx.moveTo(px(i), T - 8); ctx.lineTo(px(i), B); ctx.stroke();
+    ctx.font = '500 13px ' + SHOT_SANS;
+    ctx.fillStyle = SHOT.ink3; ctx.textAlign = 'left';
+    ctx.fillText('Pack ' + (hist[i].round + 1), px(i) + 7, T + 2);
+  }
+  if (story.pivot > 2 && story.pivot < n - 1){
+    ctx.strokeStyle = SHOT.gold;
+    ctx.beginPath(); ctx.moveTo(px(story.pivot), T - 8); ctx.lineTo(px(story.pivot), B); ctx.stroke();
+    ctx.font = '600 13px ' + SHOT_SANS;
+    ctx.fillStyle = SHOT.gold; ctx.textAlign = 'left';
+    ctx.fillText('the pivot', px(story.pivot) + 7, B - 8);
+  }
+  ctx.restore();
+
+  /* Baseline, and the depth the chart is scaled to. There is no "pick 1"
+   * label: the left-hand end of a chart that starts at pick one says so by
+   * itself, and dropping it gives the legend below a whole row to breathe in
+   * — which it needs at five colours. */
+  ctx.strokeStyle = SHOT.line; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(L, B); ctx.lineTo(R, B); ctx.stroke();
+  ctx.font = '500 13px ' + SHOT_SANS; ctx.fillStyle = SHOT.ink3;
+  ctx.textAlign = 'right'; ctx.fillText(String(maxY), L - 10, T + 4);
+
+  /* Each line twice: a dark underlay so White stays legible against the
+   * panel, exactly as the on-screen chart does it. Deepest colours last, so
+   * the deck's own identity sits on top where the lines converge. */
+  var order = shown.slice().sort(function(a, b){ return last[a] - last[b]; });
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  order.forEach(function(c){
+    var trace = function(){
+      ctx.beginPath();
+      series.forEach(function(s, i){
+        if (i) ctx.lineTo(px(i), py(s[c])); else ctx.moveTo(px(i), py(s[c]));
+      });
+    };
+    trace(); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 6; ctx.stroke();
+    trace(); ctx.strokeStyle = MTG_INK[c].dark; ctx.lineWidth = 3; ctx.stroke();
+  });
+
+  // Legend: colour, and how deep the commitment ran. Deepest first, so the
+  // deck's identity reads left to right in the order it was committed to.
+  var lx = L, ly = y + h - 18;
+  ctx.textAlign = 'left';
+  shown.slice().sort(function(a, b){ return last[b] - last[a]; }).forEach(function(c){
+    shotPath(ctx, lx, ly - 9, 16, 5, 2.5);
+    ctx.fillStyle = MTG_INK[c].dark; ctx.fill();
+    ctx.font = '500 14px ' + SHOT_SANS; ctx.fillStyle = SHOT.ink2;
+    var label = COLOR_NAMES[c] + ' ' + last[c];
+    ctx.fillText(label, lx + 23, ly);
+    lx += 23 + ctx.measureText(label).width + 24;
+  });
+  ctx.textAlign = 'right';
+  ctx.font = '500 13px ' + SHOT_SANS; ctx.fillStyle = SHOT.ink3;
+  ctx.fillText(n + ' picks', R, ly);
+}
+
+function shotCurve(ctx, cards, x, y, w, h, label){
+  shotTracked(ctx, label, x + 24, y + 30, 12, SHOT.ink3, 2.4);
+  var curve = E.curveOf(cards);
+  var keys = ['1', '2', '3', '4', '5', '6', '7+'];
+  var max = Math.max(1, Math.max.apply(null, keys.map(function(k){ return curve[k]; })));
+  var L = x + 24, R = x + w - 24, B = y + h - 30, T = y + 52;
+  var slot = (R - L) / keys.length;
+  var bw = Math.min(46, slot - 10);
+  keys.forEach(function(k, i){
+    var cx = L + slot * i + (slot - bw) / 2;
+    var bh = Math.max(2, (B - T) * (curve[k] / max));
+    shotPath(ctx, cx, B - bh, bw, bh, 4);
+    ctx.fillStyle = curve[k] ? SHOT.gold : SHOT.line;
+    ctx.globalAlpha = curve[k] ? 0.85 : 1;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center';
+    ctx.font = '500 13px ' + SHOT_SANS; ctx.fillStyle = SHOT.ink3;
+    ctx.fillText(k, cx + bw / 2, B + 20);
+    if (curve[k]){
+      ctx.font = '600 13px ' + SHOT_SANS; ctx.fillStyle = SHOT.ink2;
+      ctx.fillText(String(curve[k]), cx + bw / 2, B - bh - 7);
+    }
+  });
+}
+
+function shotColours(ctx, cards, x, y, w, h, label, footnote){
+  shotTracked(ctx, label, x + 24, y + 30, 12, SHOT.ink3, 2.4);
+  var counts = colorCounts(cards);
+  var order = ['W', 'U', 'B', 'R', 'G', 'C'];
+  var total = order.reduce(function(a, k){ return a + counts[k]; }, 0) || 1;
+  var L = x + 24, R = x + w - 24, barY = y + 52, barH = 16;
+
+  // One rounded bar, clipped, so the bands inside keep the rounded ends.
+  ctx.save();
+  shotPath(ctx, L, barY, R - L, barH, 8);
+  ctx.clip();
+  var cx = L;
+  order.forEach(function(k){
+    if (!counts[k]) return;
+    var bw = (R - L) * (counts[k] / total);
+    ctx.fillStyle = MTG_INK[k].dark;
+    ctx.fillRect(cx, barY, bw + 0.5, barH);
+    cx += bw;
+  });
+  ctx.restore();
+
+  var tx = L, ty = barY + 46;
+  ctx.textAlign = 'left';
+  order.forEach(function(k){
+    if (!counts[k]) return;
+    var pct = Math.round(counts[k] / total * 100) + '%';
+    ctx.font = '500 15px ' + SHOT_SANS; ctx.fillStyle = SHOT.ink2;
+    ctx.fillText(COLOR_NAMES[k], tx, ty);
+    var nw = ctx.measureText(COLOR_NAMES[k]).width + 6;
+    ctx.font = '700 15px ' + SHOT_SANS; ctx.fillStyle = MTG_INK[k].dark;
+    ctx.fillText(pct, tx + nw, ty);
+    tx += nw + ctx.measureText(pct).width + 22;
+  });
+
+  if (footnote){
+    ctx.font = '500 14px ' + SHOT_SANS; ctx.fillStyle = SHOT.ink3;
+    ctx.textAlign = 'left';
+    ctx.fillText(footnote, L, y + h - 22);
+  }
+}
+
+/* What the picture is of: the deck once there is one, and everything picked
+ * before that — the same fallback the colour bar on screen makes, so the two
+ * never disagree. */
+function shotSubject(){
+  if (S.deck && S.deck.length) {
+    return { cards: S.deck.concat(S.commander ? [S.commander] : []), built: true };
+  }
+  return { cards: (S.pool || []).slice(), built: false };
+}
+
+function drawShareShot(canvas){
+  var story = S.story || (S.story = buildStory());
+  if (!story) return null;
+  var subject = shotSubject();
+
+  canvas.width = SHOT_W * SHOT_SCALE;
+  canvas.height = SHOT_H * SHOT_SCALE;
+  var ctx = canvas.getContext('2d');
+  ctx.setTransform(SHOT_SCALE, 0, 0, SHOT_SCALE, 0, 0);
+  ctx.textBaseline = 'alphabetic';
+
+  ctx.fillStyle = SHOT.bg;
+  ctx.fillRect(0, 0, SHOT_W, SHOT_H);
+
+  var PAD = 48;
+
+  // --- header ---------------------------------------------------------
+  shotTracked(ctx, 'DRAFT WITH SLATER', PAD, 54, 12, SHOT.ink3, 3);
+
+  var pair = story.finalPair;
+  var guild = GUILDS[pair.join('')] ||
+    pair.map(function(c){ return COLOR_NAMES[c]; }).join('–') || 'Colourless';
+  ctx.textAlign = 'right';
+  var gs = shotFit(ctx, guild, 340, '600', 34, SHOT_SERIF, 20);
+  ctx.font = '600 ' + gs + 'px ' + SHOT_SERIF;
+  ctx.fillStyle = SHOT.gold;
+  ctx.fillText(guild, SHOT_W - PAD, 100);
+  // The colours themselves, so the guild name is not the only way in.
+  var sw = SHOT_W - PAD;
+  pair.slice().reverse().forEach(function(c){
+    shotPath(ctx, sw - 26, 114, 26, 8, 4);
+    ctx.fillStyle = MTG_INK[c].dark; ctx.fill();
+    sw -= 32;
+  });
+
+  ctx.textAlign = 'left';
+  var title = (S.chosen && S.chosen.name) || 'A draft';
+  var ts = shotFit(ctx, title, SHOT_W - PAD * 2 - 400, '600', 36, SHOT_SERIF, 19);
+  ctx.font = '600 ' + ts + 'px ' + SHOT_SERIF;
+  ctx.fillStyle = SHOT.ink;
+  ctx.fillText(title, PAD, 100);
+
+  ctx.font = '500 15px ' + SHOT_SANS;
+  ctx.fillStyle = SHOT.ink3;
+  ctx.fillText(story.hist.length + ' picks · ' + shotDate(), PAD, 126);
+
+  // --- the journey ----------------------------------------------------
+  var jY = 158, jH = 268;
+  shotPanel(ctx, PAD, jY, SHOT_W - PAD * 2, jH);
+  shotJourney(ctx, story, PAD, jY, SHOT_W - PAD * 2, jH);
+
+  // --- curve and colours ----------------------------------------------
+  var bY = jY + jH + 22, bH = SHOT_H - bY - PAD;
+  var half = (SHOT_W - PAD * 2 - 22) / 2;
+  shotPanel(ctx, PAD, bY, half, bH);
+  shotCurve(ctx, subject.cards, PAD, bY, half, bH,
+    subject.built ? 'CURVE' : 'CURVE OF EVERYTHING PICKED');
+
+  var cX = PAD + half + 22;
+  shotPanel(ctx, cX, bY, half, bH);
+  /* Counted the way anyone reading the picture would count, rather than the
+   * way the status bar splits them: it files a drafted nonbasic land under
+   * spells, which is right for deckbuilding and wrong on a souvenir. */
+  var landCount = subject.cards.filter(E.isLandCard).length;
+  shotColours(ctx, subject.cards, cX, bY, half, bH,
+    subject.built ? 'DECK COLOURS' : 'COLOURS PICKED',
+    subject.cards.length + ' cards · ' + landCount +
+      (landCount === 1 ? ' land' : ' lands'));
+
+  return story;
+}
+
+/* Named after the set rather than its code: a chaos draft's code is the word
+ * "chaos", which makes every one of them the same file in a downloads folder,
+ * and "bloomburrow" is a better thing to find later than "blb". */
+function shotFilename(){
+  var name = (S.chosen && (S.chosen.name || S.chosen.code)) || '';
+  var slug = String(name).toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 44)
+    .replace(/-+$/, '');
+  var d = new Date();
+  var pad = function(n){ return (n < 10 ? '0' : '') + n; };
+  var stamp = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
+  return ['draft', slug, stamp].filter(Boolean).join('-') + '.png';
+}
+
+/* Hand the picture to the phone's share sheet where there is one, and fall
+ * back to a download. `canShare` is asked about the actual file rather than
+ * trusted on `share` alone: desktop Chrome has `navigator.share` and refuses
+ * files, which would throw after the dialog had already been dismissed. */
+function shotSave(){
+  var canvas = $('shotCanvas');
+  if (!canvas.toBlob) { window.open(canvas.toDataURL('image/png'), '_blank'); return; }
+  canvas.toBlob(function(blob){
+    if (!blob) return;
+    var name = shotFilename(), file = null;
+    try { file = new File([blob], name, { type: 'image/png' }); } catch (e) { file = null; }
+    if (file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })){
+      navigator.share({ files: [file], title: 'My draft' }).catch(function(){});
+      return;
+    }
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    // Revoked late: Safari has been known to start the download after the
+    // click handler returns.
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
+    announce('Image saved as ' + name);
+  }, 'image/png');
+}
+
+function openShot(){
+  var story = drawShareShot($('shotCanvas'));
+  if (!story) return;
+  var subject = shotSubject();
+  $('shotSub').textContent = (S.chosen ? S.chosen.name + ' · ' : '') +
+    story.hist.length + ' picks';
+  $('shotNote').textContent = subject.built
+    ? 'No card names and no seed, so it says what you built without giving the next drafter the table.'
+    : 'Your picks so far — build the deck first for the curve and colours to mean more.';
+  var canShareFiles = !!(navigator.share && navigator.canShare);
+  $('btnShotSave').textContent = canShareFiles ? 'Share image' : 'Save image';
+  $('shotBack').classList.remove('hidden');
+  $('shotOver').classList.remove('hidden');
+  $('shotOver').scrollTop = 0;
+  $('btnShotClose').focus();
+}
+
+function closeShot(){
+  $('shotBack').classList.add('hidden');
+  $('shotOver').classList.add('hidden');
+}
+
+$('btnShareImg').onclick = openShot;
+$('btnShotClose').onclick = closeShot;
+$('btnShotSave').onclick = shotSave;
+$('shotOver').addEventListener('click', function(e){
+  if (e.target === $('shotOver')) closeShot();
+});
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && !$('shotOver').classList.contains('hidden')) closeShot();
 });
 
 /* Put the deck panel back to how a draft starts: open, showing the main

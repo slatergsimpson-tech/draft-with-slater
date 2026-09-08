@@ -288,6 +288,29 @@ remembers the table's usual settings, greets returning names, maybe a
   almost no words — they need one image that makes the evening feel earned.
   (The engine still keeps the full pick history and table log, and the
   ratings pipeline still powers the bots — the data outlived its displays.)
+- [~] 3 Expression: **the deck as a picture** — **BUILT** 2026-09-08. The one
+  thing in this app that was being done by hand: export the list, paste it
+  into Archidekt, use its deck-image feature, post that. Four steps and
+  another website, every time a draft was worth showing anyone — which is a
+  strong signal, because it is the only workflow here he repeated manually
+  rather than asking for. **Share image** on the deck screen draws the colour
+  journey, the curve and the colours onto a canvas at 1200×675 (rendered at
+  2×, about 180 KB) and hands it to the phone's share sheet, falling back to
+  a download where `navigator.canShare({files})` says no.
+  Two decisions worth keeping. **No card names and no seed.** A decklist
+  tells the next person what is in the packs and a seed tells them
+  everything; a shape tells them what you built, which is the part worth
+  showing and the part a picture is actually good at — nobody reads a
+  forty-card list in a group chat. This came straight out of his own
+  objection to sharing the finished deck. **The palette is the dark inks
+  whatever theme the app is wearing**, so the picture looks the same in
+  everybody's chat rather than betraying which mode the drafter was in.
+  Gated on the pick diary, so it appears and vanishes with the Draft story
+  button; sealed writes no diary and so has neither.
+  Still open, and deliberately next-but-one: the archetype adjectives (aggro
+  / control, artifacts / spells, a tribe when one clears a real threshold),
+  held back until there are a few real pictures to judge what is missing.
+  Verdict at next draft night.
 - [ ] 3 Discovery log —
 - [ ] 3 Deck card export —
 - [ ] 3 Fantasy dressing —
