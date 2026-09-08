@@ -307,9 +307,28 @@ remembers the table's usual settings, greets returning names, maybe a
   everybody's chat rather than betraying which mode the drafter was in.
   Gated on the pick diary, so it appears and vanishes with the Draft story
   button; sealed writes no diary and so has neither.
-  Still open, and deliberately next-but-one: the archetype adjectives (aggro
-  / control, artifacts / spells, a tribe when one clears a real threshold),
-  held back until there are a few real pictures to judge what is missing.
+  *Same day, after seeing one:* the held-back adjectives arrived, and arrived
+  as **tags you edit** rather than adjectives the app asserts — which is the
+  better version and was his correction, not mine. Everything else on the
+  picture is measured; the journey, the curve and the colours are facts about
+  what happened. The tags are the only place the drafter gets to say what the
+  deck was *for*, and which part of it to look at. So they are suggested and
+  never imposed: the app guesses up to three from the deck (speed off the
+  curve, artifacts / enchantments / spells / creatures off a type share, and
+  a creature type once four of them make it deliberate), and every word can
+  be thrown away. Tap to remove, tap a suggestion to add, or type your own;
+  six at most. Bloomburrow found the first bug within a minute — a deck of
+  Mice tagged "Mouses" — so there is now a small irregular-plural table,
+  deliberately not exhaustive, because the tag being editable is the point.
+  **Copy image** also became the leading action. He was right that a download
+  is the wrong default: a picture reaches a group chat by being pasted into
+  it, not by being found in a folder. Download stays, Share appears where the
+  browser will take a file.
+  And a number got fixed on the way: the colour split counts spells now, not
+  the whole deck. Counting seventeen basics made every deck ever built here
+  come out about 43% colourless — a true figure that says nothing, drawn as a
+  bar that looks like it says everything. The on-screen bar still counts them,
+  where "how much of this is still lands" is the live question.
   Verdict at next draft night.
 - [ ] 3 Discovery log —
 - [ ] 3 Deck card export —

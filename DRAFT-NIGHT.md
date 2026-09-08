@@ -548,10 +548,19 @@ unless — like Unfinity — the special treatment is all the set has. The line
 under the menu says exactly which sets it used and why.
 
 **How do I show someone a deck I liked?** Press **Share image** on the deck
-screen. It draws your draft as one picture — the colour journey with the
-pivot marked, the mana curve, the colour split, the set and the date — and on
-a phone it goes straight to the share sheet, so it can be in the group chat in
-two taps. On a computer it saves as a PNG.
+screen. It draws your draft as one picture — your tags, the colour journey
+with the pivot marked, the mana curve, the colour split, the set and the date.
+**Copy image** puts it on the clipboard so you can paste it straight into the
+group chat, **Download** saves the PNG, and on a phone **Share** hands it to
+the usual share sheet.
+
+**Tags** are the part you write. The app opens with a guess from your deck —
+its speed, whether it is full of artifacts or spells, and a creature type if
+you drafted enough of them to mean it — and every word of it can be thrown
+away. Tap a tag to remove it, tap a suggestion to add it, or type your own:
+*Go wide*, *Aristocrats*, *the one with four Bats*. Six at most. Everything
+else on the picture is measured; the tags are the only place you get to say
+what the deck was actually *for*.
 
 There are deliberately **no card names on it, and no seed**. A decklist tells
 whoever reads it what was in the packs, and a seed hands them the whole draft;
@@ -560,6 +569,10 @@ part a picture is good at — nobody reads a forty-card list in a group chat.
 Build the deck first: before that the picture is your picks so far, and says
 so. Sealed has no picture, for the same reason it has no draft story — there
 were no picks to remember.
+
+The colour split counts your spells, not the whole deck. Counting the lands
+made every deck come out about 43% colourless, which is true, useless, and
+looks like it means something.
 
 **Where do I get a cube?** The cube tab opens on **Find a cube**. The official
 cubes — Vintage, Legacy, Modern, Arena and the rest of the ones Wizards runs —

@@ -635,6 +635,20 @@
   .shotbox{max-width:780px}
   .shotcanvas{width:100%; height:auto; display:block; border-radius:10px;
               border:1px solid var(--line); margin-top:6px}
+  /* Tag editing. Chips already on the picture read gold; the suggestions
+     underneath are quieter, so it is obvious which ones are in. */
+  .shottags{margin-top:12px}
+  .tagchips{display:flex; flex-wrap:wrap; gap:7px}
+  .tagchips:empty{display:none}
+  .tagchip{display:inline-flex; align-items:center; gap:8px; cursor:pointer;
+           background:var(--bg2); border:1px solid var(--line); color:var(--gold2);
+           border-radius:999px; padding:5px 12px; font:inherit; font-size:13px;
+           font-weight:600; line-height:1.3}
+  .tagchip:hover{border-color:var(--gold)}
+  .tagchip i{font-style:normal; color:var(--ink3); font-size:14px; line-height:1}
+  .tagchip.suggest{color:var(--ink2); font-weight:500}
+  .tagadd{display:flex; gap:7px; margin-top:8px}
+  .tagadd input{flex:1; min-width:0}
   .storysec .sub{font-size:12px; color:var(--ink3); margin-bottom:10px}
   .storychart{width:100%; height:auto; display:block; background:var(--bg2); border:1px solid var(--line); border-radius:10px}
   .storylegend{display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; font-size:12px; color:var(--ink2)}
@@ -1507,9 +1521,21 @@
         <button class="btn sm" id="btnShotClose">Close</button>
       </div>
       <canvas id="shotCanvas" class="shotcanvas"></canvas>
+      <div class="shottags">
+        <div class="tagchips" id="shotChips"></div>
+        <div class="tagadd">
+          <label class="sr-only" for="shotTagInput">Add a tag</label>
+          <input id="shotTagInput" type="text" maxlength="22" autocomplete="off"
+                 placeholder="What was this deck for?">
+          <button class="btn sm" id="btnShotTagAdd">Add</button>
+        </div>
+        <div class="tagchips" id="shotSuggest"></div>
+      </div>
       <div class="hint" id="shotNote"></div>
       <div class="storyfoot">
-        <button class="btn primary" id="btnShotSave" style="flex:1">Save image</button>
+        <button class="btn primary" id="btnShotCopy" style="flex:1">Copy image</button>
+        <button class="btn hidden" id="btnShotShare">Share</button>
+        <button class="btn" id="btnShotSave">Download</button>
       </div>
     </div>
   </div>
@@ -6560,7 +6586,7 @@ function wireGuestSide(conn){
     MP.started = true;
     MP.seat = N.seatOf(MP.table, MP.me);
     MP.log = [];
-    S.story = null;
+    S.story = null; S.shotTags = null;
     MP.winstonGuest = msg.mode === 'winston';
     MP.wremote = null;
     S.wNote = '';
@@ -8238,7 +8264,7 @@ function startPlay(seedOverride){
   S.spellTarget = rules.commander ? 40 : 23;
   // A fresh draft gets a fresh story; sealed never writes one. The guest
   // diary is cleared too, so a table you left cannot narrate a solo draft.
-  S.story = null;
+  S.story = null; S.shotTags = null;
   S.pileScroll = 0;
   /* A new draft is a new set of worlds, so the basics have to be worked out
    * again. Without this the lands kept whatever art the last draft chose —
@@ -9934,13 +9960,96 @@ document.addEventListener('keydown', function(e){
  * picture looks the same in everybody's chat rather than betraying which
  * mode the drafter happened to be in. */
 
-var SHOT_W = 1200, SHOT_H = 675, SHOT_SCALE = 2;
+var SHOT_W = 1200, SHOT_H = 720, SHOT_SCALE = 2;
 var SHOT = {
   bg: '#17140f', panel: '#211b13', line: '#3b3122',
   ink: '#f0e8d7', ink2: '#bcb09a', ink3: '#8b8069', gold: '#e8c95a'
 };
 var SHOT_SANS = '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
 var SHOT_SERIF = '"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif';
+
+/* Tags: the one part of the picture the drafter writes.
+ *
+ * Everything else on it is measured — the journey, the curve and the colours
+ * are facts about what happened. The tags are the claim: what the deck was
+ * *for*, and which part of it you want looked at. So they are suggested and
+ * never imposed. The app opens with a guess so there is something to edit
+ * rather than an empty box, and every word of it can be thrown away. */
+var SHOT_MAX_TAGS = 6;
+
+/* Creature types whose plural is not "+s", the ones common enough in a draft
+ * that getting them wrong is embarrassing. Bloomburrow found this one
+ * immediately: a deck full of Mice was tagged "Mouses". Not exhaustive, and
+ * it does not need to be — the tag is editable, which is the whole point. */
+var SHOT_PLURALS = {
+  mouse: 'Mice', goose: 'Geese', ox: 'Oxen', fungus: 'Fungi',
+  homunculus: 'Homunculi', nautilus: 'Nautili', octopus: 'Octopuses',
+  djinn: 'Djinn', efreet: 'Efreet', merfolk: 'Merfolk', kithkin: 'Kithkin',
+  eldrazi: 'Eldrazi', samurai: 'Samurai', sheep: 'Sheep', fish: 'Fish',
+  jellyfish: 'Jellyfish', spawn: 'Spawn', kavu: 'Kavu', dwarf: 'Dwarves'
+};
+
+// "Elf" is not a deck. Enough of them is.
+function shotPlural(word){
+  var known = SHOT_PLURALS[String(word).toLowerCase()];
+  if (known) return known;
+  if (/f$/i.test(word)) return word.replace(/f$/i, 'ves');
+  if (/(s|x|z|ch|sh)$/i.test(word)) return word + 'es';
+  return word + 's';
+}
+
+function deriveShotTags(cards){
+  var spells = cards.filter(function(c){ return !E.isLandCard(c); });
+  if (spells.length < 8) return [];
+  var out = [];
+
+  /* Speed, from where the curve sits. The thresholds are limited's, not
+   * constructed's: a 2.5 average is a genuinely aggressive draft deck. */
+  var avg = spells.reduce(function(a, c){ return a + E.cmcOf(c); }, 0) / spells.length;
+  out.push(avg < 2.6 ? 'Aggro' : avg > 3.4 ? 'Control' : 'Midrange');
+
+  var share = function(re){
+    return spells.filter(function(c){ return re.test(c.type_line || ''); }).length / spells.length;
+  };
+  if (share(/\bArtifact\b/) >= 0.3) out.push('Artifacts');
+  if (share(/\bEnchantment\b/) >= 0.25) out.push('Enchantments');
+  if (share(/\b(Instant|Sorcery)\b/) >= 0.35) out.push('Spells');
+  else if (share(/\bCreature\b/) >= 0.68) out.push('Creatures');
+
+  // A tribe is only a tribe once there are enough of them to be on purpose.
+  var tribes = {};
+  spells.forEach(function(c){
+    var line = c.type_line || '';
+    if (!/\bCreature\b/.test(line)) return;
+    var tail = line.split('//')[0].split('—')[1];
+    if (!tail) return;
+    tail.trim().split(/\s+/).forEach(function(t){
+      if (t.length > 2) tribes[t] = (tribes[t] || 0) + 1;
+    });
+  });
+  var top = Object.keys(tribes).sort(function(a, b){ return tribes[b] - tribes[a]; })[0];
+  if (top && tribes[top] >= 4) out.push(shotPlural(top));
+
+  return out.slice(0, 3);
+}
+
+function shotTags(){
+  if (S.shotTags) return S.shotTags;
+  var sub = shotSubject();
+  var guess = deriveShotTags(sub.cards);
+  /* Only remembered once there is a deck for them to be about. Opening the
+   * picture before building would otherwise freeze a guess made from the
+   * whole forty-five-card pool, and it would still be there — describing
+   * nothing — after the deck was built. */
+  if (sub.built) S.shotTags = guess;
+  return guess;
+}
+
+// The editable list. Touching the tags at all makes them yours to keep.
+function shotTagList(){
+  if (!S.shotTags) S.shotTags = shotTags().slice();
+  return S.shotTags;
+}
 
 function shotPath(ctx, x, y, w, h, r){
   r = Math.min(r, w / 2, h / 2);
@@ -9976,6 +10085,24 @@ function shotTracked(ctx, text, x, y, px, colour, track){
   return cx - track - x;
 }
 
+// The tags, as pills across the picture. Anything that will not fit on the
+// row is dropped rather than clipped — a half-drawn word looks like a bug.
+function shotTagRow(ctx, tags, x, y, maxW){
+  var px = x;
+  ctx.textAlign = 'left';
+  ctx.font = '600 16px ' + SHOT_SANS;
+  tags.forEach(function(t){
+    var w = ctx.measureText(t).width + 32;
+    if (px + w > x + maxW) return;
+    shotPath(ctx, px, y, w, 34, 17);
+    ctx.fillStyle = SHOT.panel; ctx.fill();
+    ctx.strokeStyle = SHOT.line; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = SHOT.gold;
+    ctx.fillText(t, px + 16, y + 23);
+    px += w + 10;
+  });
+}
+
 // Shrink a heading until it fits rather than letting it run off the picture.
 function shotFit(ctx, text, max, weight, px, family, floor){
   var size = px;
@@ -10009,25 +10136,30 @@ function shotJourney(ctx, story, x, y, w, h){
 
   shotTracked(ctx, 'THE COLOUR JOURNEY', x + 24, y + 30, 12, SHOT.ink3, 2.4);
 
-  // Pack boundaries: the three chapters of a draft, unlabelled would be a
-  // line nobody could read.
+  /* Pack boundaries: the three chapters of a draft. A line nobody can read
+   * is decoration, so each is labelled — and the label flips to the inside
+   * when its line lands near the right-hand edge, which a late pivot always
+   * does and which would otherwise run the words off the picture. */
+  var mark = function(i, colour, weight, text, ty){
+    var lx = px(i);
+    ctx.strokeStyle = colour;
+    ctx.beginPath(); ctx.moveTo(lx, T - 8); ctx.lineTo(lx, B); ctx.stroke();
+    ctx.font = weight + ' 13px ' + SHOT_SANS;
+    ctx.fillStyle = colour === SHOT.gold ? SHOT.gold : SHOT.ink3;
+    var room = R - lx > ctx.measureText(text).width + 14;
+    ctx.textAlign = room ? 'left' : 'right';
+    ctx.fillText(text, lx + (room ? 7 : -7), ty);
+  };
+
   ctx.save();
   ctx.setLineDash([4, 6]);
   ctx.lineWidth = 1.5;
   for (var i = 1; i < n; i++){
     if (hist[i].round === hist[i - 1].round) continue;
-    ctx.strokeStyle = SHOT.line;
-    ctx.beginPath(); ctx.moveTo(px(i), T - 8); ctx.lineTo(px(i), B); ctx.stroke();
-    ctx.font = '500 13px ' + SHOT_SANS;
-    ctx.fillStyle = SHOT.ink3; ctx.textAlign = 'left';
-    ctx.fillText('Pack ' + (hist[i].round + 1), px(i) + 7, T + 2);
+    mark(i, SHOT.line, '500', 'Pack ' + (hist[i].round + 1), T + 2);
   }
   if (story.pivot > 2 && story.pivot < n - 1){
-    ctx.strokeStyle = SHOT.gold;
-    ctx.beginPath(); ctx.moveTo(px(story.pivot), T - 8); ctx.lineTo(px(story.pivot), B); ctx.stroke();
-    ctx.font = '600 13px ' + SHOT_SANS;
-    ctx.fillStyle = SHOT.gold; ctx.textAlign = 'left';
-    ctx.fillText('the pivot', px(story.pivot) + 7, B - 8);
+    mark(story.pivot, SHOT.gold, '600', 'the pivot', B - 8);
   }
   ctx.restore();
 
@@ -10196,8 +10328,18 @@ function drawShareShot(canvas){
   ctx.fillStyle = SHOT.ink3;
   ctx.fillText(story.hist.length + ' picks · ' + shotDate(), PAD, 126);
 
+  // --- the tags -------------------------------------------------------
+  /* The canvas is a fixed size whether or not there are any, so an untagged
+   * picture is not a differently-shaped picture. With no tags the room goes
+   * to the two panels at the bottom, which are happy to have it. */
+  var tags = shotTags(), jY = 158;
+  if (tags.length){
+    shotTagRow(ctx, tags, PAD, 146, SHOT_W - PAD * 2);
+    jY = 200;
+  }
+
   // --- the journey ----------------------------------------------------
-  var jY = 158, jH = 268;
+  var jH = 268;
   shotPanel(ctx, PAD, jY, SHOT_W - PAD * 2, jH);
   shotJourney(ctx, story, PAD, jY, SHOT_W - PAD * 2, jH);
 
@@ -10210,12 +10352,21 @@ function drawShareShot(canvas){
 
   var cX = PAD + half + 22;
   shotPanel(ctx, cX, bY, half, bH);
-  /* Counted the way anyone reading the picture would count, rather than the
-   * way the status bar splits them: it files a drafted nonbasic land under
-   * spells, which is right for deckbuilding and wrong on a souvenir. */
+  /* Colours across the spells, not the whole deck.
+   *
+   * Counting the lands made every deck ever built here come out about 43%
+   * colourless, because seventeen basics are seventeen colourless cards —
+   * a true number that says nothing, drawn as a bar that looks like it says
+   * everything. Excluding them, the bar is the deck's identity, and a
+   * genuinely colourless artifact deck now reads as one. The card and land
+   * totals underneath keep the arithmetic honest.
+   *
+   * The bar on screen still counts them; it is a live readout while the deck
+   * is half-built, where "how much of this is still lands" is the question. */
   var landCount = subject.cards.filter(E.isLandCard).length;
-  shotColours(ctx, subject.cards, cX, bY, half, bH,
-    subject.built ? 'DECK COLOURS' : 'COLOURS PICKED',
+  var spells = subject.cards.filter(function(c){ return !E.isLandCard(c); });
+  shotColours(ctx, spells.length ? spells : subject.cards, cX, bY, half, bH,
+    subject.built ? 'SPELL COLOURS' : 'COLOURS PICKED',
     subject.cards.length + ' cards · ' + landCount +
       (landCount === 1 ? ' land' : ' lands'));
 
@@ -10236,21 +10387,54 @@ function shotFilename(){
   return ['draft', slug, stamp].filter(Boolean).join('-') + '.png';
 }
 
-/* Hand the picture to the phone's share sheet where there is one, and fall
- * back to a download. `canShare` is asked about the actual file rather than
- * trusted on `share` alone: desktop Chrome has `navigator.share` and refuses
- * files, which would throw after the dialog had already been dismissed. */
+function shotBlob(){
+  var canvas = $('shotCanvas');
+  return new Promise(function(resolve, reject){
+    if (!canvas.toBlob) { reject(new Error('no toBlob')); return; }
+    canvas.toBlob(function(b){ b ? resolve(b) : reject(new Error('no blob')); }, 'image/png');
+  });
+}
+
+// Say what happened on the button that was pressed, then put it back.
+function shotFlash(btn, msg){
+  if (btn.dataset.label === undefined) btn.dataset.label = btn.textContent;
+  btn.textContent = msg;
+  clearTimeout(btn.__flash);
+  btn.__flash = setTimeout(function(){ btn.textContent = btn.dataset.label; }, 1800);
+}
+
+/* Copy, which is how a picture actually reaches a group chat: paste it into
+ * the conversation rather than go and find a file.
+ *
+ * The blob is handed to ClipboardItem as a *promise* rather than awaited
+ * first. Safari only permits a clipboard write inside the gesture that asked
+ * for it, and awaiting anything beforehand spends that permission — the write
+ * then fails with a security error and no explanation. */
+function shotCopy(){
+  var btn = $('btnShotCopy');
+  if (!window.ClipboardItem || !navigator.clipboard || !navigator.clipboard.write){
+    shotFlash(btn, 'Copying not supported — use Download');
+    return;
+  }
+  try {
+    var item = new ClipboardItem({ 'image/png': shotBlob() });
+    navigator.clipboard.write([item]).then(function(){
+      shotFlash(btn, 'Copied — paste it anywhere');
+      announce('Deck image copied to the clipboard');
+    }, function(){
+      shotFlash(btn, 'Could not copy — use Download');
+    });
+  } catch (e) {
+    shotFlash(btn, 'Could not copy — use Download');
+  }
+}
+
+// Download, for when the picture wants keeping rather than pasting.
 function shotSave(){
   var canvas = $('shotCanvas');
   if (!canvas.toBlob) { window.open(canvas.toDataURL('image/png'), '_blank'); return; }
-  canvas.toBlob(function(blob){
-    if (!blob) return;
-    var name = shotFilename(), file = null;
-    try { file = new File([blob], name, { type: 'image/png' }); } catch (e) { file = null; }
-    if (file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })){
-      navigator.share({ files: [file], title: 'My draft' }).catch(function(){});
-      return;
-    }
+  shotBlob().then(function(blob){
+    var name = shotFilename();
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = name;
@@ -10259,7 +10443,82 @@ function shotSave(){
     // click handler returns.
     setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
     announce('Image saved as ' + name);
-  }, 'image/png');
+    shotFlash($('btnShotSave'), 'Saved');
+  }, function(){});
+}
+
+/* The phone's own share sheet, where the browser will take a file. `canShare`
+ * is asked about the actual file rather than `share` being trusted on its
+ * own: desktop Chrome has `navigator.share` and refuses files, which would
+ * throw after the dialog had already been dismissed. */
+function shotCanShare(){
+  if (!navigator.share || !navigator.canShare || !window.File) return false;
+  try {
+    return navigator.canShare({ files: [new File([new Blob()], 'x.png', { type: 'image/png' })] });
+  } catch (e) { return false; }
+}
+
+function shotShare(){
+  shotBlob().then(function(blob){
+    var file;
+    try { file = new File([blob], shotFilename(), { type: 'image/png' }); } catch (e) { return; }
+    if (navigator.canShare && !navigator.canShare({ files: [file] })) return;
+    navigator.share({ files: [file], title: 'My draft' }).catch(function(){});
+  }, function(){});
+}
+
+/* The tag editor: what is on the picture, and what the deck suggests you
+ * might add. Removing is one tap on the tag itself, because a tag you no
+ * longer want is the commonest edit and should not need a second control. */
+function renderShotTags(){
+  var tags = shotTags();
+  $('shotChips').innerHTML = tags.map(function(t, i){
+    return '<button type="button" class="tagchip" data-i="' + i +
+      '" aria-label="Remove tag ' + esc(t) + '">' + esc(t) + '<i aria-hidden="true">&times;</i></button>';
+  }).join('');
+  Array.prototype.forEach.call($('shotChips').children, function(b){
+    b.onclick = function(){
+      shotTagList().splice(+b.dataset.i, 1);
+      redrawShot();
+    };
+  });
+
+  var have = {};
+  tags.forEach(function(t){ have[t.toLowerCase()] = 1; });
+  var spare = deriveShotTags(shotSubject().cards)
+    .concat(['Ramp', 'Fliers', 'Removal', 'Sacrifice', 'Tokens', 'Lifegain'])
+    .filter(function(t){ return !have[t.toLowerCase()]; });
+  var seen = {};
+  spare = spare.filter(function(t){
+    if (seen[t]) return false; seen[t] = 1; return true;
+  }).slice(0, 6);
+
+  var full = tags.length >= SHOT_MAX_TAGS;
+  $('shotSuggest').innerHTML = full ? '' : spare.map(function(t){
+    return '<button type="button" class="tagchip suggest" aria-label="Add tag ' +
+      esc(t) + '">+ ' + esc(t) + '</button>';
+  }).join('');
+  Array.prototype.forEach.call($('shotSuggest').children, function(b){
+    b.onclick = function(){ addShotTag(b.textContent.replace(/^\+\s*/, '')); };
+  });
+  $('shotTagInput').disabled = full;
+  $('btnShotTagAdd').disabled = full;
+}
+
+function addShotTag(text){
+  var t = String(text || '').trim().replace(/\s+/g, ' ').slice(0, 22);
+  if (!t) return;
+  var tags = shotTagList();
+  if (tags.length >= SHOT_MAX_TAGS) return;
+  if (tags.some(function(x){ return x.toLowerCase() === t.toLowerCase(); })) return;
+  tags.push(t);
+  $('shotTagInput').value = '';
+  redrawShot();
+}
+
+function redrawShot(){
+  drawShareShot($('shotCanvas'));
+  renderShotTags();
 }
 
 function openShot(){
@@ -10271,8 +10530,17 @@ function openShot(){
   $('shotNote').textContent = subject.built
     ? 'No card names and no seed, so it says what you built without giving the next drafter the table.'
     : 'Your picks so far — build the deck first for the curve and colours to mean more.';
-  var canShareFiles = !!(navigator.share && navigator.canShare);
-  $('btnShotSave').textContent = canShareFiles ? 'Share image' : 'Save image';
+  renderShotTags();
+
+  /* Copy leads: pasting a picture into a conversation is the whole point, and
+   * a download is the fallback for keeping one. Where copying is not offered
+   * at all, the download has to be the button that looks like the action. */
+  var canCopy = !!(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write);
+  $('btnShotCopy').classList.toggle('hidden', !canCopy);
+  $('btnShotSave').classList.toggle('primary', !canCopy);
+  $('btnShotSave').style.flex = canCopy ? '' : '1';
+  $('btnShotShare').classList.toggle('hidden', !shotCanShare());
+
   $('shotBack').classList.remove('hidden');
   $('shotOver').classList.remove('hidden');
   $('shotOver').scrollTop = 0;
@@ -10286,7 +10554,16 @@ function closeShot(){
 
 $('btnShareImg').onclick = openShot;
 $('btnShotClose').onclick = closeShot;
+$('btnShotCopy').onclick = shotCopy;
+$('btnShotShare').onclick = shotShare;
 $('btnShotSave').onclick = shotSave;
+$('btnShotTagAdd').onclick = function(){ addShotTag($('shotTagInput').value); };
+$('shotTagInput').addEventListener('keydown', function(e){
+  if (e.key !== 'Enter') return;
+  // Enter in the tag box adds a tag; it must not reach the dialog behind it.
+  e.preventDefault();
+  addShotTag($('shotTagInput').value);
+});
 $('shotOver').addEventListener('click', function(e){
   if (e.target === $('shotOver')) closeShot();
 });
