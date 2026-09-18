@@ -341,6 +341,33 @@ remembers the table's usual settings, greets returning names, maybe a
   bar that looks like it says everything. The on-screen bar still counts them,
   where "how much of this is still lands" is the live question.
   Verdict at next draft night.
+- [x] Submission: **draft a decade in one tap** — 2026-09-17. He had been
+  narrowing all three chaos slots to an era by hand, which is three dropdowns
+  inside a disclosure — and it did not work. A slot the reels land on holds a
+  *set code*, not a rule, so an era survived exactly one pull of the handle:
+  the second roll found a concrete code, fell back to "any set", and quietly
+  went back to all of Magic. Nobody would report that as a bug; it just feels
+  like the reels ignoring you. The era now lives in one place
+  (`S.chaosEra`) and every roll reads it, including the eight-sets-a-round
+  pool that *true chaos* draws from, so "the nineties" narrows all twenty-four
+  packs. A row of chips above the reels sets it and pulls the handle in the
+  same gesture, because the era was only ever chosen in order to roll within
+  it. Each chip carries its set count: 1993–1999 is 27 sets and 2021–now is
+  44, and a narrow era repeats itself.
+- [x] Fidelity: **the set list is environments only** — 2026-09-17. Two
+  complaints, one cause: Scryfall's set list is a collection database, and
+  this app had been treating every row of it as a thing you can draft. So
+  Foreign Black Border sat next to Revised (it *is* Revised, in German), The
+  List sat there as a 5,663-card "set", and Ravnica: Clue Edition and
+  Foundations Jumpstart were being shuffled into Murders at Karlov Manor and
+  Foundations packs as though they were bonus sheets. 184 rows became 168,
+  under three rules: no foreign-language reprint of a set already present; no
+  child set (an environment is a top-level set — anything Scryfall hangs off
+  another is a sheet *inside* it, and the real ones still arrive through
+  their parent); and a named list of things that were never a draft format,
+  each with its reason written down, because the reason is the part that will
+  be argued with. Kept on purpose: Commander Legends, Battlebond, Mystery
+  Booster 2, the Un-sets — Wizards sold boosters and people drafted them.
 - [ ] 3 Discovery log —
 - [ ] 3 Deck card export —
 - [ ] 3 Fantasy dressing —

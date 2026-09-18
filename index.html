@@ -635,6 +635,17 @@
   .shotbox{max-width:780px}
   .shotcanvas{width:100%; height:auto; display:block; border-radius:10px;
               border:1px solid var(--line); margin-top:6px}
+  /* The era preset above the reels. Chips rather than another dropdown: the
+     whole point is that it is one tap from wanting the nineties to drafting
+     them. */
+  .erapicks{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px}
+  .erapick{background:var(--bg2); border:1px solid var(--line); color:var(--ink2);
+           border-radius:999px; padding:6px 13px; font:inherit; font-size:13px;
+           cursor:pointer; line-height:1.3}
+  .erapick:hover:not(:disabled){border-color:var(--gold); color:var(--ink)}
+  .erapick.on{background:var(--gold); border-color:var(--gold);
+              color:var(--accent-ink); font-weight:600}
+  .erapick small{display:block; font-size:10.5px; opacity:.72; letter-spacing:.3px}
   /* The name box is set in the display face at the size it will be drawn, so
      typing into it looks like typing on the picture. */
   .shotname{margin-top:12px}
@@ -1115,6 +1126,12 @@
           Three packs, eight players, one pod — and every pack can come from a different
           corner of thirty years. Pull the handle and see where you land.
         </p>
+
+        <!-- Which stretch of the thirty years the reels draw from. One tap,
+             because narrowing all three packs to a decade by hand meant three
+             dropdowns and it did not survive the next roll. -->
+        <div class="erapicks" id="chaosEras" role="group"
+             aria-label="Which era the packs come from"></div>
 
         <!-- The roll. Three reels of set symbols, settling one at a time. -->
         <div class="slot">
@@ -4830,6 +4847,44 @@ var DRAFTABLE_TYPES = { core:1, expansion:1, masters:1, draft_innovation:1 };
  * fun to leave out. */
 var FUNNY_DRAFTABLE = { ugl:1, unh:1, ust:1, und:1, unf:1 };
 
+/* Foreign-language printings of a set that already exists in English.
+ *
+ * Scryfall lists them as sets in their own right, which is correct for a
+ * collection database and wrong for a draft list: Foreign Black Border *is*
+ * Revised, and offering both means the reels can land on the same
+ * environment twice under two names. Renaissance and Rinascimento are the
+ * awkward pair — European-only white-bordered reprints with no English
+ * printing of their own, so they are reprints of sets that are already
+ * here. */
+var FOREIGN_REPRINTS = { fbb:1, '4bb':1, bchr:1, ren:1, rin:1 };
+
+/* Sets Scryfall lists that are not draft environments.
+ *
+ * The rule this list encodes: a set belongs here if Wizards sold boosters of
+ * it and people drafted it as its own thing. Each of these fails that in a
+ * different way, so the reason matters more than the entry.
+ *
+ *   plst  The List. A rotating pool of reprints that turns up as one slot in
+ *         somebody else's pack. It was never a product.
+ *   jmp   Jumpstart, and its sequels. You open two themed packs and shuffle
+ *   j22   them together. There is no draft to have.
+ *   mbc   Mystery Booster Commander Edition — a Commander deck product.
+ *   sum   Summer Magic: a corrected rerun of Revised, almost all of which was
+ *         destroyed. Not a distinct environment, and barely a set.
+ *   mat   March of the Machine: The Aftermath. Fifty cards in five-card
+ *         boosters, sold as an epilogue and never a draft format.
+ *   acr   Assassin's Creed. Eight-card Beyond boosters, which Wizards said
+ *         outright were not for drafting.
+ *
+ * Jumpstart 2025 is missing from the list on purpose: it hangs off
+ * Foundations and the parent rule below catches it. */
+var NOT_AN_ENVIRONMENT = { plst:1, jmp:1, j22:1, mbc:1, sum:1, mat:1, acr:1 };
+
+function setExcluded(code){
+  code = String(code || '').toLowerCase();
+  return !!(FOREIGN_REPRINTS[code] || NOT_AN_ENVIRONMENT[code]);
+}
+
 async function loadSets(){
   var page = await api('/sets');
   if (!page) throw new Error('Could not load the set list.');
@@ -4838,7 +4893,15 @@ async function loadSets(){
   S.allSets = page.data || [];
   return S.allSets.filter(function(s){
     var kind = DRAFTABLE_TYPES[s.set_type] || FUNNY_DRAFTABLE[String(s.code || '').toLowerCase()];
-    return kind && !s.digital && s.released_at && s.card_count >= 60;
+    if (!kind || s.digital || !s.released_at || s.card_count < 60) return false;
+    if (setExcluded(s.code)) return false;
+    /* An environment is a top-level set. Anything Scryfall hangs off another
+     * set is a sheet *inside* it, not something to draft on its own — the
+     * Time Spiral purple cards, The Big Score, Foundations Jumpstart,
+     * Ravnica: Clue Edition, and every foreign black border. The ones that
+     * really are opened in their parent's packs still arrive that way,
+     * through bonusSetsFor and the pack rules. */
+    return !s.parent_set_code;
   }).sort(function(a,b){ return a.released_at < b.released_at ? -1 : 1; });
 }
 
@@ -4852,11 +4915,22 @@ async function loadSets(){
  * case worth having (Special Guests, Enchanting Tales, Retro Artifacts,
  * Mystical Archive), so this is a whitelist rather than a blacklist. */
 var BONUS_TYPES = { masterpiece: 1, draft_innovation: 1, expansion: 1, masters: 1 };
+
+/* Child sets that are separate products rather than sheets in the parent's
+ * packs. Scryfall's parent link means "belongs to this release", not "comes
+ * out of this booster", and these three are the cases where the difference
+ * bites: Foundations Jumpstart is its own boxed product, Ravnica: Clue
+ * Edition is its own boxed game, and Chronicles Foreign Black Border is
+ * Chronicles in another language. None of them is ever opened in a pack of
+ * the set they hang off. */
+var NOT_A_BONUS_SHEET = { j25: 1, clu: 1, bchr: 1 };
+
 function bonusSetsFor(code){
   if (!S.bonusSheets) return [];
   return (S.allSets || []).filter(function(x){
     return x.parent_set_code === code && x.code !== code &&
-      BONUS_TYPES[x.set_type] && !x.digital && (x.card_count || 0) >= 5;
+      BONUS_TYPES[x.set_type] && !x.digital && (x.card_count || 0) >= 5 &&
+      !NOT_A_BONUS_SHEET[String(x.code || '').toLowerCase()];
   }).slice(0, 2);
 }
 
@@ -6775,6 +6849,7 @@ function shareParams(){
   if (S.source === 'chaos') {
     p.s = 'chaos';
     p.slots = S.chaosSlots.join(',');
+    if (S.chaosEra && S.chaosEra !== 'all') p.era = S.chaosEra;
     p.mode = $('chaosMode').value;
     p.spread = $('chaosSpread').value;
     p.fmt = $('chaosFmt').value;
@@ -6867,6 +6942,8 @@ function applyShareLink(){
   if (p.s === 'chaos') {
     pickTab('chaos');
     if (p.slots) S.chaosSlots = p.slots.split(',');
+    if (p.era) S.chaosEra = p.era;
+    renderChaosEras();
     renderChaosSlots();
     if (p.mode) $('chaosMode').value = p.mode;
     if (p.spread) $('chaosSpread').value = p.spread;
@@ -7020,6 +7097,8 @@ async function init(){
     renderEraTabs();
     showSetStep('era');
     renderSetList();
+    // The era chips count the sets in each era, so they wait for the list too.
+    renderChaosEras();
     renderChaosSlots();
     renderCubeSetImport();
     /* A shared link sets the screen up and, when it names both a source and a
@@ -7067,6 +7146,26 @@ var RANDOM_CHOICES = [
   { value: 'random:e5', label: 'Random — 2021–now' }
 ];
 S.chaosSlots = ['random', 'random', 'random'];
+S.chaosEra = 'all';
+
+/* Which stretch of the thirty years the reels draw from.
+ *
+ * This has to live apart from the slots, because a slot the reels have
+ * landed on holds a *set code* rather than a rule. Narrowing a slot to an
+ * era therefore survived exactly one pull of the handle: the second roll
+ * found a concrete code, fell back to "any set", and quietly went back to
+ * all of Magic. Keeping the era in one place means it is still there on the
+ * fourth roll, which is what a preset has to do to be worth having. */
+function chaosEraRule(){
+  return (!S.chaosEra || S.chaosEra === 'all') ? 'random' : 'random:' + S.chaosEra;
+}
+
+// A slot still holding a rule keeps it; one holding a result falls back to
+// the era, which is the rule it was rolled under.
+function chaosRuleFor(i){
+  var v = S.chaosSlots[i] || 'random';
+  return v.indexOf('random') === 0 ? v : chaosEraRule();
+}
 
 function eraOf(set){
   for (var i = 1; i < ERAS.length; i++) {
@@ -7099,6 +7198,45 @@ function chaosOptionsHTML(selected, filter){
 }
 
 function chaosSpread(){ return $('chaosSpread').value; }
+
+/* The era preset: one tap for "draft the nineties".
+ *
+ * Choosing an era points every slot that is not pinned at it and pulls the
+ * handle, because those two things were always done together — the era is
+ * only ever chosen in order to roll within it. The count under each label is
+ * the honest bit: 1993–1999 is thirty-odd sets and 2021–now is fifty, and a
+ * narrow era repeats itself, which is worth knowing before you land on the
+ * same set twice. */
+function renderChaosEras(){
+  var cur = S.chaosEra || 'all';
+  $('chaosEras').innerHTML = ERAS.map(function(e){
+    // No count until the set list is in: "0 sets" would be a lie told twice,
+    // once about the era and once about the app.
+    var n = (S.sets && S.sets.length)
+      ? chaosCandidates(e.id === 'all' ? 'random' : 'random:' + e.id).length : 0;
+    return '<button type="button" class="erapick' + (e.id === cur ? ' on' : '') +
+      '" data-era="' + e.id + '" aria-pressed="' + (e.id === cur ? 'true' : 'false') + '">' +
+      esc(e.id === 'all' ? 'Any era' : e.label) +
+      (n ? '<small>' + n + ' sets</small>' : '') + '</button>';
+  }).join('');
+  Array.prototype.forEach.call($('chaosEras').children, function(b){
+    b.onclick = function(){
+      S.chaosEra = b.dataset.era;
+      /* Point the rollable slots at the era too, so the dropdowns under
+       * "Pin a pack" agree with the chip. A pinned slot is a decision the
+       * player made by hand and is left exactly where it is. */
+      for (var i = 0; i < S.chaosSlots.length; i++) {
+        if (!chaosSlotPinned(i)) S.chaosSlots[i] = chaosEraRule();
+      }
+      renderChaosEras();
+      renderChaosSlots();
+      updateChaosHint();
+      announce(b.dataset.era === 'all' ? 'Rolling from every era'
+        : 'Rolling from ' + ERAS.filter(function(e){ return e.id === b.dataset.era; })[0].label);
+      rollChaosPacks();
+    };
+  });
+}
 
 function updateChaosHint(){
   var perSeat = $('chaosMode').value === 'seat';
@@ -7200,7 +7338,7 @@ function renderChaosSlots(){
      * roll again if you don't fancy it. Respects the filter box and any era
      * limit the slot is currently set to. */
     $('chaosRoll' + i).onclick = function(){
-      var pool = chaosCandidates(S.chaosSlots[i].indexOf('random') === 0 ? S.chaosSlots[i] : 'random');
+      var pool = chaosCandidates(chaosRuleFor(i));
       var q = (filter.value || '').toLowerCase().trim();
       if (q) {
         var narrowed = pool.filter(function(x){
@@ -7309,14 +7447,14 @@ function resolveChaosRounds(seed, perSeat, seats, spread){
     }
     // Your own pinned choice comes first: it is the one you asked for.
     (pinnedFirst || []).forEach(add);
-    var bag = chaosCandidates('random').slice();
+    var bag = chaosCandidates(chaosEraRule()).slice();
     var guard = 0;
     while (pool.length < Math.min(seats, MAX_CHAOS_SETS) && bag.length && guard++ < 600) {
       add(bag.splice(Math.floor(rng() * bag.length), 1)[0]);
     }
     // A small set list can run out of unused sets; better to repeat than to
     // hand back a short table.
-    if (!pool.length) pool = chaosCandidates('random').slice(0, MAX_CHAOS_SETS);
+    if (!pool.length) pool = chaosCandidates(chaosEraRule()).slice(0, MAX_CHAOS_SETS);
     return pool;
   }
 
@@ -7332,7 +7470,7 @@ function resolveChaosRounds(seed, perSeat, seats, spread){
     // Table mode: a pinned slot is pinned for everyone.
     if (s.pinned && !perSeat) return { shared: s.pinned };
 
-    var candidates = chaosCandidates(s.choice.indexOf('random') === 0 ? s.choice : 'random');
+    var candidates = chaosCandidates(s.choice.indexOf('random') === 0 ? s.choice : chaosEraRule());
     if (!perSeat) return { shared: candidates[Math.floor(rng() * candidates.length)] };
 
     var pool = sharedPool || drawPool(s.pinned ? [s.pinned] : [], true);
@@ -7611,7 +7749,7 @@ function rollChaosPacks(){
   var spin = [], results = {};
   [0, 1, 2].forEach(function(i){
     if (chaosSlotPinned(i)) return;
-    var pool = chaosCandidates(S.chaosSlots[i].indexOf('random') === 0 ? S.chaosSlots[i] : 'random');
+    var pool = chaosCandidates(chaosRuleFor(i));
     var filter = $('chaosFilter' + i);
     var q = filter ? (filter.value || '').toLowerCase().trim() : '';
     if (q) {
@@ -7926,7 +8064,7 @@ Array.prototype.forEach.call($('sourceTabs').children, function(b){
     $('srcSet').classList.toggle('hidden', S.source !== 'set');
     $('srcChaos').classList.toggle('hidden', S.source !== 'chaos');
     $('srcCube').classList.toggle('hidden', S.source !== 'cube');
-    if (S.source === 'chaos') renderChaosSlots();
+    if (S.source === 'chaos') { renderChaosEras(); renderChaosSlots(); }
     updateLobbySource();
   };
 });

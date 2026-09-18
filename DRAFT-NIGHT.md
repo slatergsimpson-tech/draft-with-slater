@@ -519,11 +519,37 @@ symbols settle, and draft whatever they land on. The order they landed in is
 not fixed: **drag a reel sideways** to move a pack, because opening a set
 first is not the same as opening it last — pack one sets the tone and pack
 three decides what your deck ends up being. (Arrow keys move a reel too.)
+**Want a particular decade?** The row of eras above the reels is one tap:
+choose *1993–1999* and all three packs come from the nineties, and they keep
+coming from the nineties every time you pull the handle again. It applies to
+*Every player opens their own set* too, where it narrows all twenty-four
+packs. Each chip says how many sets it is choosing from — a narrow era
+repeats itself, which is worth knowing before the same set turns up twice.
 Open **Pin a pack** if you want to fix one of the three to a set you have been
-meaning to try, or narrow a slot to an era; whatever you pin is left alone and
-the rest are rolled.
+meaning to try; whatever you pin is left alone and the rest are rolled.
 **Who opens what** decides whether the whole table shares a set each round or
 every seat opens its own — the second is the real thing.
+
+**Why isn't every Scryfall set in the list?** Because not everything Scryfall
+calls a set is something you can draft. The list is 168 **environments** — a
+set plus everything its own boosters can contain, bonus sheets and all. Three
+kinds of thing are left out:
+
+- **Foreign-language reprints of a set that is already here.** Foreign Black
+  Border *is* Revised; Renaissance and Rinascimento are European-only
+  reprints of cards from sets already in the list. Offering both means the
+  reels can land on the same environment twice under two names.
+- **Sheets that live inside another set.** The Time Spiral purple cards, The
+  Big Score, Foundations Jumpstart, Ravnica: Clue Edition. The ones that
+  really are opened in their parent's packs still arrive that way — you get
+  them by drafting the set they belong to.
+- **Things that were never a draft format.** The List (a pool of reprints
+  that appears as one slot in somebody else's pack, never sold on its own),
+  Jumpstart, March of the Machine: The Aftermath, Assassin's Creed, Summer
+  Magic, Mystery Booster Commander Edition.
+
+Commander Legends, Battlebond, the Un-sets and Mystery Booster 2 all stay:
+Wizards sold boosters of them and people drafted them.
 
 **Can I draft the Un-sets?** Yes — Unglued, Unhinged, Unstable, Unsanctioned
 and Unfinity are all in the set list, in their own eras. Pack sizes are the
