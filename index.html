@@ -2020,6 +2020,16 @@
     return false;
   }
 
+  /* Can packs actually be built from this?
+   *
+   * A set can arrive with hundreds of cards and still be unopenable — every
+   * card filtered out as a token, a basic, a meld result or a bonus sheet.
+   * "Cards came back" is not the same question, and answering the easy one
+   * is how three empty packs reached a deckbuilder without an error. */
+  function openable(cards) {
+    return boosterCards(cards || []).some(function (c) { return !c.__bonus; });
+  }
+
   function boosterCards(cards) {
     var nonBasic = cards.filter(function (c) {
       return !isBasicLand(c) && c.layout !== 'token' && c.layout !== 'art_series' &&
@@ -2028,12 +2038,23 @@
     /* `booster: false` means "not in this card's own set's boosters" — and a
      * bonus sheet has no boosters of its own, so every card on one carries
      * it. Mystical Archive, Breaking News and The Big Score are all flagged
-     * that way, and dropping them here meant those sheets were loaded, tagged
-     * and then silently never dealt: Strixhaven has been drafting without its
-     * Archive. A card the loader fetched *as* a sheet is in the parent's
-     * packs by definition, so the flag does not apply to it. */
-    var inBoosters = nonBasic.filter(function (c) { return c.__bonus || c.booster !== false; });
-    return inBoosters.length ? inBoosters : nonBasic;
+     * that way, and dropping them meant those sheets were loaded, tagged and
+     * then silently never dealt: Strixhaven was drafting without its Archive.
+     * A card the loader fetched *as* a sheet is in the parent's packs by
+     * definition, so the flag does not apply to it.
+     *
+     * The two groups are judged separately, and that separation is the whole
+     * point. Scryfall flags every card of a set it has not finished marking
+     * up — an unreleased one — as `booster: false`, and the fallback below
+     * exists to rescue exactly that case by using the whole set. Letting
+     * sheet cards count towards "did we find anything in boosters" broke it:
+     * Secrets of Strixhaven's 195 Archive cards satisfied the test on their
+     * own, the fallback never fired, and all 368 cards of the actual set were
+     * thrown away. The draft opened, dealt three empty packs and ended. */
+    var sheets = nonBasic.filter(function (c) { return c.__bonus; });
+    var main = nonBasic.filter(function (c) { return !c.__bonus; });
+    var inBoosters = main.filter(function (c) { return c.booster !== false; });
+    return (inBoosters.length ? inBoosters : main).concat(sheets);
   }
 
   function buildPools(cards, setInfo, opts) {
@@ -3904,6 +3925,7 @@
     isBasicLand: isBasicLand,
     isMeldResult: isMeldResult,
     boosterCards: boosterCards,
+    openable: openable,
     newBot: newBot,
     botPick: botPick,
     botPickScore: botPickScore,
@@ -8087,7 +8109,7 @@ async function loadChaosStage(rounds, opts){
 
   var cardsBySet = {}, good = [], dead = [];
   needed.forEach(function(setInfo, i){
-    if (loaded[i] && loaded[i].length) {
+    if (loaded[i] && loaded[i].length && E.openable(loaded[i])) {
       cardsBySet[setInfo.code] = loaded[i];
       good.push(setInfo);
       return;
@@ -8096,7 +8118,7 @@ async function loadChaosStage(rounds, opts){
     // An empty answer means the set really has nothing openable; a thrown
     // error means the network or Scryfall was the problem, and the set may be
     // perfectly fine next time. Only blacklist the first kind.
-    if (loaded[i] && !loaded[i].length) DEAD_SETS[setInfo.code] = true;
+    if (loaded[i] && !E.openable(loaded[i])) DEAD_SETS[setInfo.code] = true;
   });
 
   var subs = {};
@@ -8566,6 +8588,13 @@ $('btnStart').onclick = async function(){
     });
     $('loadBar').style.width = '100%';
     if (!cards.length) throw new Error('Scryfall returned no cards for this set.');
+    /* Cards arriving is not the same as packs being buildable. Saying so
+     * here costs one line and turns a draft that silently ends before it
+     * starts into a sentence naming the set. */
+    if (!E.openable(cards)) {
+      throw new Error(S.chosen.name + ' has no cards that can go in a booster, so there is ' +
+        'nothing to draft from it.');
+    }
     // Sign off with a line from the set itself before the packs open — and
     // let the room become the set while that line is still on screen.
     stopFlavour();

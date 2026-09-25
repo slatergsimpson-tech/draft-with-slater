@@ -401,6 +401,21 @@ remembers the table's usual settings, greets returning names, maybe a
   partner needs a second mythic in the pack to displace and almost never
   finds one. It takes the cheapest card instead, which is the trade a real
   booster made.
+  *Broke a draft the same day, and worth recording.* Secrets of Strixhaven /
+  Final Fantasy / Lord of the Rings opened three empty packs and dumped him
+  straight into an empty deckbuilder, with no error anywhere. Scryfall flags
+  every card of a set it has not finished marking up — an unreleased one — as
+  `booster: false`, and `boosterCards` has always had a fallback for exactly
+  that: if nothing looks pack-legal, use the whole set. Letting sheet cards
+  count towards "did we find anything" broke the fallback, because Secrets of
+  Strixhaven's 195 Archive cards satisfied it on their own — so all 368 cards
+  of the actual set were discarded and the packs had nothing but a sheet to
+  draw from. The two groups are judged separately now. The deeper fault was
+  that it failed *silently*: "cards came back" was being checked where "packs
+  can be built" was meant, so there is now an `openable()` that asks the
+  second question, and both the single-set and chaos paths use it — a set
+  that cannot open is named in an error or swapped out, the way a dead set
+  already was.
   Still open, and both waiting on him rather than on work: Reality Fracture's
   echoed pairs (the mechanism is built, but nothing in Scryfall's data
   identifies which cards pair with which — no oracle text, no `all_parts`
