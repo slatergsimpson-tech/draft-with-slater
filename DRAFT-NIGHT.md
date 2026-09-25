@@ -530,6 +530,39 @@ meaning to try; whatever you pin is left alone and the rest are rolled.
 **Who opens what** decides whether the whole table shares a set each round or
 every seat opens its own — the second is the real thing.
 
+**How often do bonus sheets show up?** As often as they really did, where
+that is known. The old single dial ran every sheet at the same rate, which
+was wrong in both directions at once: a Mystical Archive card is in *every*
+Strixhaven pack, while a Zendikar Expedition was a chase insert at something
+like one booster in two hundred. Running both at "one pack in four" made
+Strixhaven feel thin and made an Expedition a shrug.
+
+Sheets with a known rate now use it and ignore the dial — the set note under
+the Start button says which, and says when a sheet is falling back to the
+dial instead. Box toppers (Zendikar Rising Expeditions, the Ultimate Masters
+toppers) are gone entirely: they came on top of the booster box, so a pack
+could never contain one. A set with two sheets gets two rates — Outlaws of
+Thunder Junction deals Breaking News every pack and The Big Score far less
+often.
+
+The rates are from memory of the published collation, not from a file the app
+can check, so if one looks wrong to you it probably is — tell me and it is a
+one-line change.
+
+**Alternate treatments — showcase, borderless, extended art?** Deliberately
+ignored. A borderless Lightning Bolt is a Lightning Bolt: the same card, the
+same pick, the same deck. The app keeps one printing per card per set (the
+lowest collector number, which is the ordinary one) so a set's showcase run
+cannot flood a rarity slot with cards you already have. What treatment a card
+would have been printed in changes nothing about drafting it, so no rate is
+modelled for it.
+
+**Battlebond partners.** Battlebond's twelve "Partner with" legends were
+collated so that opening one put the other in the same pack — that is the
+whole premise of the set. The app does this now. Dealing them independently,
+which is what it used to do, turned a designed pair into a coincidence that
+almost never happened.
+
 **Why isn't every Scryfall set in the list?** Because not everything Scryfall
 calls a set is something you can draft. The list is 168 **environments** — a
 set plus everything its own boosters can contain, bonus sheets and all. Three

@@ -1078,9 +1078,11 @@
               <option value="0">Off</option>
             </select>
             <div class="hint">
-              Special Guests, Enchanting Tales, Retro Artifacts and the like. Real rates vary a lot
-              by set and by sheet — some are one per pack, some one in dozens — so this is a dial,
-              not a claim about any particular set. Only applies to sets that have one.
+              Special Guests, Enchanting Tales, Retro Artifacts and the like. Sheets whose real
+              rate is known use it and ignore this — a Mystical Archive card is in every Strixhaven
+              pack, a Zendikar Expedition in about one booster in two hundred, and box toppers were
+              never inside a pack at all. This dial is for the rest, and the set note says which is
+              which.
             </div>
           </div>
           <details class="mpbox" id="ratingsBox" style="margin:12px 0">
@@ -1719,6 +1721,15 @@
       note: 'Unstable: 15-card boosters. Contraptions come through the ordinary rarity slots.'
     },
 
+    /* --- Battlebond: partners come as a pair ---
+     * The rarity spread is ordinary; what is not ordinary is that the two
+     * halves of a "Partner with" pair were collated into the same booster.
+     * Dealing them independently makes a twelve-pair set into a lottery. */
+    bbd: {
+      pairs: 'partnerWith',
+      note: 'Battlebond: a "Partner with" card brings its partner into the same pack, as the real boosters did.'
+    },
+
     // --- 12-card ---
     all: {
       slots: [
@@ -1872,13 +1883,84 @@
     }
   };
 
+  /* How often a bonus sheet actually turns up.
+   *
+   * One dial for every set was the wrong shape, and wrong in both directions
+   * at once. A Mystical Archive card is in *every* Strixhaven pack — it owns
+   * a slot — while Zendikar Expeditions were a chase insert somewhere around
+   * one booster in two hundred. Running both at "one pack in four" makes
+   * Strixhaven feel empty and makes an Expedition a shrug.
+   *
+   * Keyed by the *sheet's* set code, not the set being drafted, because a
+   * set can have two sheets with different rates: Outlaws of Thunder
+   * Junction deals a Breaking News card every pack and a Big Score card
+   * far less often.
+   *
+   * Rates are from memory of the published collation, not from a file we can
+   * check, so each one says what it is claiming. A sheet that is not in here
+   * falls back to the dial, and the setup screen says which is which — a
+   * guessed number presented as a fact is worse than an admitted dial. */
+  var SHEET_RATES = {
+    // Owns a slot: one in every pack.
+    sta: { rate: 1, note: 'one Mystical Archive card in every pack' },
+    brr: { rate: 1, note: 'one Retro Artifact in every pack' },
+    mul: { rate: 1, note: 'one Multiverse Legend in every pack' },
+    otp: { rate: 1, note: 'one Breaking News card in every pack' },
+    // Chase inserts. Rare enough that finding one is the point.
+    exp: { rate: 1 / 216, note: 'a chase insert, not a pack slot — roughly one booster in two hundred' },
+    mps: { rate: 1 / 144, note: 'a chase insert, not a pack slot — roughly one booster in a hundred and fifty' },
+    mp2: { rate: 1 / 144, note: 'a chase insert, not a pack slot — roughly one booster in a hundred and fifty' },
+    /* Box toppers. Not rare inside a pack — not inside a pack at all. These
+     * came on top of the booster box, so a drafted pack can never contain
+     * one, and bonusSetsFor skips them rather than fetching a set that can
+     * never be dealt. */
+    zne: { rate: 0, note: 'a box topper — one per booster box, never inside a pack' },
+    puma: { rate: 0, note: 'a box topper — one per booster box, never inside a pack' }
+  };
+
+  /* Cards that are collated together: open one and its partner is in the
+   * same pack. Battlebond is the set built on this — its twelve "Partner
+   * with" pairs were printed so that the two halves always arrive together,
+   * and dealing them independently turns the set's whole premise into a
+   * coincidence that almost never happens.
+   *
+   * A finder returns { cardName: partnerCard }. Keep them derivable from card
+   * data rather than hand-listed: a hand-list is a thing to maintain, and
+   * this one reads the rule straight off the card. */
+  var PAIR_FINDERS = {
+    partnerWith: function (cards) {
+      var byName = {}, pairs = {};
+      cards.forEach(function (c) { byName[(c.name || '').toLowerCase()] = c; });
+      cards.forEach(function (c) {
+        var m = /Partner with ([^(\n.]+)/i.exec(oracleOf(c));
+        if (!m) return;
+        var other = byName[m[1].trim().toLowerCase()];
+        if (other && other !== c) pairs[c.name] = other;
+      });
+      return pairs;
+    }
+  };
+
   // Mythic rares begin with Magic 2010 (2009-07-17).
   var MYTHIC_ERA = '2009-07-17';
   var MYTHIC_CHANCE = 1 / 8;
 
+  var DEFAULT_RULES = {
+    slots: DEFAULT_15,
+    note: 'Standard 15-card booster: 11 common / 3 uncommon / 1 rare.'
+  };
+
   function packRulesFor(setInfo) {
-    var r = PACK_RULES[String(setInfo.code || '').toLowerCase()];
-    return r ? r : { slots: DEFAULT_15, note: 'Standard 15-card booster: 11 common / 3 uncommon / 1 rare.' };
+    var r = PACK_RULES[String((setInfo && setInfo.code) || '').toLowerCase()];
+    if (!r) return DEFAULT_RULES;
+    // An entry may describe only what is unusual about a set — Battlebond
+    // changes how cards are collated, not how many of each rarity there are.
+    if (!r.slots && !r.customPools) {
+      var filled = { slots: DEFAULT_15 };
+      Object.keys(r).forEach(function (k) { filled[k] = r[k]; });
+      return filled;
+    }
+    return r;
   }
 
   function hasMythics(setInfo) {
@@ -1943,7 +2025,14 @@
       return !isBasicLand(c) && c.layout !== 'token' && c.layout !== 'art_series' &&
         c.layout !== 'emblem' && c.layout !== 'double_faced_token' && !isMeldResult(c);
     });
-    var inBoosters = nonBasic.filter(function (c) { return c.booster !== false; });
+    /* `booster: false` means "not in this card's own set's boosters" — and a
+     * bonus sheet has no boosters of its own, so every card on one carries
+     * it. Mystical Archive, Breaking News and The Big Score are all flagged
+     * that way, and dropping them here meant those sheets were loaded, tagged
+     * and then silently never dealt: Strixhaven has been drafting without its
+     * Archive. A card the loader fetched *as* a sheet is in the parent's
+     * packs by definition, so the flag does not apply to it. */
+    var inBoosters = nonBasic.filter(function (c) { return c.__bonus || c.booster !== false; });
     return inBoosters.length ? inBoosters : nonBasic;
   }
 
@@ -1985,6 +2074,31 @@
     });
 
     var rules = packRulesFor(setInfo);
+
+    /* Each sheet gets its own rate, because a set can carry two of them at
+     * very different frequencies. A sheet we have a published rate for uses
+     * it; anything else falls back to the dial, and says so. */
+    var bySheet = {};
+    pools.bonus.forEach(function (c) {
+      var code = String(c.set || '').toLowerCase();
+      (bySheet[code] = bySheet[code] || []).push(c);
+    });
+    pools.bonusSheets = Object.keys(bySheet).map(function (code) {
+      var known = SHEET_RATES[code];
+      return {
+        code: code,
+        cards: bySheet[code],
+        rate: known ? known.rate : pools.bonusRate,
+        known: !!known,
+        note: known ? known.note : ''
+      };
+    });
+
+    // Sets whose cards are collated in pairs work out which those are once,
+    // here, rather than re-reading every oracle text for every pack.
+    if (rules.pairs && PAIR_FINDERS[rules.pairs]) {
+      pools.pairs = PAIR_FINDERS[rules.pairs](boosterCards(cards));
+    }
 
     // Sets with bespoke slots (currently MBC) build their own named pools.
     if (rules.customPools && POOL_BUILDERS[rules.customPools]) {
@@ -2087,17 +2201,20 @@
     var taken = Object.create(null);
     var pack = [];
 
-    /* A bonus sheet can take one slot from the commons, the way Special
-     * Guests and Enchanting Tales do. It is NOT guaranteed: real rates run
-     * from one per pack down to one in dozens depending on the set and the
-     * sheet, so the frequency is a dial rather than an assumption. */
-    var bonusRate = pools.bonusRate === undefined ? 1 : pools.bonusRate;
-    var hasBonusSlot = pools.bonus && pools.bonus.length &&
-      !rules.customPools &&
+    /* A bonus sheet takes one slot from the commons, the way Mystical
+     * Archive and Retro Artifacts do. Each sheet is rolled on its own rate,
+     * so a set carrying two of them — Breaking News every pack and a Big
+     * Score card occasionally — deals them at the frequencies they really
+     * had, rather than both at whatever one dial happened to say. */
+    var canBonus = !rules.customPools &&
       !rules.slots.some(function (s) { return s.special === 'timeshifted'; });
     var bonusCards = [];
-    if (hasBonusSlot && (bonusRate >= 1 || rng() < bonusRate)) {
-      bonusCards = drawUnique(pools.bonus, 1, taken, rng);
+    if (canBonus) {
+      (pools.bonusSheets || []).forEach(function (sheet) {
+        if (!sheet.cards.length || sheet.rate <= 0) return;
+        if (sheet.rate < 1 && rng() >= sheet.rate) return;
+        bonusCards = bonusCards.concat(drawUnique(sheet.cards, 1, taken, rng));
+      });
     }
 
     rules.slots.forEach(function (slot) {
@@ -2152,7 +2269,51 @@
       pack = pack.concat(drawUnique(poolForSlot, want, taken, rng));
     });
 
-    return pack.concat(bonusCards);
+    pack = pack.concat(bonusCards);
+    if (pools.pairs) pack = addPairs(pack, pools.pairs, taken, rng);
+    return pack;
+  }
+
+  /* Bring in the partner of anything that arrived with one.
+   *
+   * The partner replaces another card of its own rarity rather than being
+   * added on top, so the pack keeps its size and its shape — a Battlebond
+   * pack with a rare pair is still a pack with one rare slot's worth of
+   * rares, it is just that the slot came out as two halves of a pair. The
+   * card it displaces is chosen from the back of the pack and is never
+   * itself half of a pair, so two pairs in one booster cannot eat each
+   * other. */
+  var RARITY_RANK = { common: 0, uncommon: 1, rare: 2, mythic: 3 };
+
+  function addPairs(pack, pairs, taken, rng) {
+    for (var i = 0; i < pack.length; i++) {
+      var mate = pairs[pack[i].name];
+      if (!mate || taken[mate.name]) continue;
+      /* Prefer to displace a card of the partner's own rarity, so a pack's
+       * shape survives intact. Where that is impossible — and for a mythic
+       * partner it nearly always is, since a pack rarely holds two — take
+       * the cheapest card instead rather than leaving a half on its own.
+       * A real Battlebond pack with a rare pair did give up a lesser card
+       * for it; this is the same trade, and dropping the pair entirely
+       * (which is what requiring an exact rarity match did) breaks the one
+       * rule the set exists to keep. Never displaces the other half of a
+       * pair, and never a bonus-sheet card. */
+      var same = -1, cheapest = -1, cheapestRank = 99;
+      for (var k = pack.length - 1; k >= 0; k--) {
+        if (k === i) continue;
+        var c = pack[k];
+        if (pairs[c.name] || c.__bonus) continue;
+        if (same === -1 && c.rarity === mate.rarity) same = k;
+        var rank = RARITY_RANK[c.rarity] === undefined ? 0 : RARITY_RANK[c.rarity];
+        if (rank < cheapestRank) { cheapestRank = rank; cheapest = k; }
+      }
+      var idx = same !== -1 ? same : cheapest;
+      if (idx === -1) continue;
+      delete taken[pack[idx].name];
+      taken[mate.name] = true;
+      pack[idx] = instance(mate);
+    }
+    return pack;
   }
 
   /* ------------------------------------------------------------------ *
@@ -3716,6 +3877,7 @@
 
   return {
     PACK_RULES: PACK_RULES,
+    SHEET_RATES: SHEET_RATES,
     POOL_BUILDERS: POOL_BUILDERS,
     MBC_RANGES: MBC_RANGES,
     collectorNumber: collectorNumber,
@@ -4925,12 +5087,35 @@ var BONUS_TYPES = { masterpiece: 1, draft_innovation: 1, expansion: 1, masters: 
  * the set they hang off. */
 var NOT_A_BONUS_SHEET = { j25: 1, clu: 1, bchr: 1 };
 
+/* A sheet the engine rates at zero can never be dealt, so there is no point
+ * fetching it — box toppers came on top of the booster box rather than
+ * inside a pack. One source of truth: the rate table in the engine. */
+function sheetNeverInPacks(code){
+  var r = E.SHEET_RATES[String(code || '').toLowerCase()];
+  return !!r && r.rate <= 0;
+}
+
+/* What this set's bonus sheets do, and — the part that matters — whether the
+ * app knows their real rate or is guessing with the dial. A number presented
+ * as a fact when it is a setting is the kind of thing this app should never
+ * do quietly. */
+function sheetNoteFor(code){
+  var sheets = bonusSetsFor(code);
+  if (!sheets.length) return '';
+  var parts = sheets.map(function(x){
+    var r = E.SHEET_RATES[String(x.code || '').toLowerCase()];
+    return x.name + (r ? ' — ' + r.note : ' — rate unknown, so it follows the Bonus sheet dial');
+  });
+  return ' Bonus sheet: ' + parts.join('. ') + '.';
+}
+
 function bonusSetsFor(code){
   if (!S.bonusSheets) return [];
   return (S.allSets || []).filter(function(x){
     return x.parent_set_code === code && x.code !== code &&
       BONUS_TYPES[x.set_type] && !x.digital && (x.card_count || 0) >= 5 &&
-      !NOT_A_BONUS_SHEET[String(x.code || '').toLowerCase()];
+      !NOT_A_BONUS_SHEET[String(x.code || '').toLowerCase()] &&
+      !sheetNeverInPacks(x.code);
   }).slice(0, 2);
 }
 
@@ -6136,7 +6321,8 @@ function chooseSet(s){
   $('btnStart').textContent = (r.commander ? 'Commander draft: ' : 'Draft ') + s.name;
   $('setNote').classList.remove('hidden');
   $('setNote').textContent = r.note + (r.commander
-    ? ' Decks are 60 cards, singleton, within your commander’s colour identity.' : '');
+    ? ' Decks are 60 cards, singleton, within your commander’s colour identity.' : '') +
+    sheetNoteFor(s.code);
   $('fmt').disabled = !!r.commander;
 }
 

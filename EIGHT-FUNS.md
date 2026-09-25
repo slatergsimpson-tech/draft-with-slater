@@ -368,6 +368,45 @@ remembers the table's usual settings, greets returning names, maybe a
   each with its reason written down, because the reason is the part that will
   be argued with. Kept on purpose: Commander Legends, Battlebond, Mystery
   Booster 2, the Un-sets — Wizards sold boosters and people drafted them.
+- [x] Fidelity: **collation, per sheet and per pair** — 2026-09-25. He said
+  the sets with pack-opening gimmicks felt inconsistent, and he was right
+  twice over — one of them a silent bug nobody could have reported.
+  **Bonus sheets were never being dealt at all** for half the sets that have
+  one. Scryfall flags Mystical Archive, Breaking News and The Big Score as
+  `booster: false`, which means "not in this card's *own* set's boosters" —
+  and a sheet has no boosters of its own, so every card on one carries it.
+  `boosterCards` read that as "not in any pack" and dropped them, so the app
+  loaded the Archive, tagged it, badged it, and then silently never put a
+  card from it in a pack. Strixhaven has been drafting without its Archive
+  since bonus sheets shipped. A card the loader fetched *as* a sheet is in
+  the parent's packs by definition, so the flag does not apply to it.
+  **One dial for every sheet was the wrong shape.** Rates are per sheet now,
+  keyed by the sheet rather than the set, because a set can carry two at
+  very different frequencies. Mystical Archive, Retro Artifacts, Multiverse
+  Legends and Breaking News own a slot and are in every pack; Expeditions,
+  Inventions and Invocations are chase inserts around one booster in a
+  hundred and fifty; box toppers are not fetched at all, because they were
+  never inside a pack. Anything unknown still uses the dial, and the set note
+  says which is which — the rates come from memory of the published
+  collation rather than a file that can be checked, and a guessed number
+  presented as a fact is worse than an admitted dial.
+  **Cards that travel in pairs.** A general mechanism — a set can declare how
+  its pairs are recognised, and a partner displaces another card rather than
+  being added on top, so the pack keeps its size. Battlebond runs on it: its
+  twelve "Partner with" legends were collated together, and dealing them
+  independently turned the premise of the set into a coincidence. Measured
+  over 4,000 packs: 1,797 contained half a pair and all 1,797 contained the
+  other half. The first version required the partner to displace a card of
+  its *own* rarity, which quietly dropped nearly half of them — a mythic
+  partner needs a second mythic in the pack to displace and almost never
+  finds one. It takes the cheapest card instead, which is the trade a real
+  booster made.
+  Still open, and both waiting on him rather than on work: Reality Fracture's
+  echoed pairs (the mechanism is built, but nothing in Scryfall's data
+  identifies which cards pair with which — no oracle text, no `all_parts`
+  link, only a `prepare` layout that is something else), and Mystery Booster
+  2, whose 385 cards are 224 rares and whose real contents are slot-based
+  like MBC rather than 11/3/1.
 - [ ] 3 Discovery log —
 - [ ] 3 Deck card export —
 - [ ] 3 Fantasy dressing —
