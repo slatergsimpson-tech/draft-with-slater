@@ -8167,6 +8167,20 @@ async function prefetchChaosRounds(plan, from){
         }
         seats[sIdx].setInfo = use;
         seats[sIdx].cards = (got && got.length) ? got : null;
+        /* Write the cards back into the plan as well as into the live draft.
+         *
+         * S.chaosRounds is what a redraft rebuilds from, and it starts life
+         * with nulls for every round past the first — the whole point of the
+         * prefetch is that rounds two and three arrive while pack one is on
+         * screen. Filling only the draft meant the plan stayed empty, so
+         * "Redraft this set" produced a draft that opened pack one fine and
+         * then sat on "Shuffling up pack 2" until the forty-five-second
+         * timeout ended it. The plan is the durable record; keep it current. */
+        var planRound = S.chaosRounds && S.chaosRounds[i];
+        if (planRound) {
+          var slot = planRound.seats ? planRound.seats[sIdx] : planRound;
+          if (slot) { slot.setInfo = use; slot.cards = seats[sIdx].cards; }
+        }
       }
       if (stage.note) {
         S.chaosSkipped = (S.chaosSkipped ? S.chaosSkipped + ' ' : '') + stage.note;
@@ -8775,6 +8789,23 @@ function startPlay(seedOverride){
     MP.pendingStart = false;
     hostStartDraft();
     return;
+  }
+
+  /* Top up anything the plan is still missing.
+   *
+   * Belt and braces for the redraft above: the plan is kept current now, but
+   * a redraft started *during* the first draft's prefetch would still find
+   * later rounds empty, and so would a draft whose prefetch failed once.
+   * Asking again is nearly free — every set it needs is already in SET_CACHE
+   * — and the alternative is another silent wait on pack two. */
+  if (isChaos && S.chaosPlan) {
+    var firstGap = -1;
+    S.chaosRounds.forEach(function(r, i){
+      var srcs = r.seats || [r];
+      var short = srcs.some(function(s){ return !s.cards || !s.cards.length; });
+      if (short && firstGap === -1) firstGap = i;
+    });
+    if (firstGap >= 0) prefetchChaosRounds(S.chaosPlan, firstGap);
   }
 
   show('viewDraft');

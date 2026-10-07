@@ -422,6 +422,26 @@ remembers the table's usual settings, greets returning names, maybe a
   link, only a `prepare` layout that is something else), and Mystery Booster
   2, whose 385 cards are 224 rares and whose real contents are slot-based
   like MBC rather than 11/3/1.
+- [x] **Redraft stalled on pack two** — 2026-10-07. Reported from a phone, but
+  nothing to do with phones: every chaos redraft did it, and a phone is just
+  where redrafting twice in a row is the natural thing to do. A chaos draft
+  starts as soon as round one's sets are in hand and fetches rounds two and
+  three in the background — that laziness is what makes the mode usable. The
+  prefetch wrote the cards it fetched into the live draft and nowhere else,
+  while "Redraft this set" rebuilds from the *plan*, which still had nulls
+  for every round past the first. So the redraft opened pack one perfectly,
+  reached pack two, found no cards, and sat on "Shuffling up pack 2…" until
+  the forty-five-second timeout ended the draft and handed back fifteen
+  picks. The plan is the durable record, so the prefetch keeps it current
+  now, and `startPlay` tops up anything still missing — which also covers
+  redrafting *during* the first draft's prefetch, the case the first fix
+  would have missed.
+  Confirmed by reverting: on the previous build the redraft stalled for the
+  full thirty-two seconds of the test on "Shuffling up pack 2…" after exactly
+  fifteen picks; on this one the same sets and the same gesture run all three
+  packs with no stall at all. Worth doing — a plausible cause and a proven one
+  are not the same thing, and this file is only useful if it records the
+  second kind.
 - [ ] 3 Discovery log —
 - [ ] 3 Deck card export —
 - [ ] 3 Fantasy dressing —
