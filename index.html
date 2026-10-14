@@ -8141,9 +8141,42 @@ async function loadChaosStage(rounds, opts){
  * One round at a time, so the requests stay spread out and a draft that ends
  * early has not pulled sets nobody will ever see. Each round is written into
  * the live draft state, where the engine picks it up when that round opens. */
-async function prefetchChaosRounds(plan, from){
+/* Only ever one prefetch at a time.
+ *
+ * Two of them running together is not a slow draft, it is a broken one. They
+ * append the same "these sets had nothing to open" note twice, and — worse —
+ * they race on the same seat slots, so one can write a null over cards the
+ * other had already fetched. A seat holding null can never be ready, and the
+ * round it belongs to waits for it for ever: the draft stops dead on
+ * "shuffling up pack three".
+ *
+ * This happened the moment startPlay learned to top the plan up, because the
+ * chaos start path calls startPlay and then starts a prefetch of its own one
+ * line later — both with the same `from`, both for the same two rounds. So
+ * runs are chained rather than allowed to overlap, and the second one finds
+ * every round already filled and does nothing. */
+var CHAOS_PREFETCH = null;
+
+function chaosRoundHasCards(i){
+  var r = S.chaosRounds && S.chaosRounds[i];
+  if (!r) return false;
+  return (r.seats || [r]).every(function(s){ return s && s.cards && s.cards.length; });
+}
+
+function prefetchChaosRounds(plan, from){
+  var mine = (CHAOS_PREFETCH || Promise.resolve())
+    .then(function(){ return prefetchChaosRoundsNow(plan, from); })
+    .catch(function(){});
+  CHAOS_PREFETCH = mine;
+  mine.then(function(){ if (CHAOS_PREFETCH === mine) CHAOS_PREFETCH = null; });
+  return mine;
+}
+
+async function prefetchChaosRoundsNow(plan, from){
   for (var i = from; i < plan.length; i++) {
     if (!S.draft || S.source !== 'chaos') return;    // the draft went away
+    // Already in hand — from the opening stage, or from a run before this one.
+    if (chaosRoundHasCards(i)) continue;
     try {
       var stage = await loadChaosStage([plan[i]], { progress: false });
       if (!stage.good.length) continue;              // try the next round anyway
@@ -8165,8 +8198,14 @@ async function prefetchChaosRounds(plan, from){
           use = stage.good[sIdx % stage.good.length];
           got = stage.cards[use.code];
         }
+        /* Never trade cards we already have for nothing. A later pass that
+         * cannot find a set must leave the seat as it was — writing its null
+         * over good cards is the difference between a round that opens and a
+         * round that waits for ever. */
+        var filled = (got && got.length) ? got : null;
+        if (!filled && seats[sIdx].cards && seats[sIdx].cards.length) continue;
         seats[sIdx].setInfo = use;
-        seats[sIdx].cards = (got && got.length) ? got : null;
+        seats[sIdx].cards = filled;
         /* Write the cards back into the plan as well as into the live draft.
          *
          * S.chaosRounds is what a redraft rebuilds from, and it starts life
@@ -8182,7 +8221,9 @@ async function prefetchChaosRounds(plan, from){
           if (slot) { slot.setInfo = use; slot.cards = seats[sIdx].cards; }
         }
       }
-      if (stage.note) {
+      // Say it once. The same round reporting the same swap twice reads as
+      // two separate failures, which is how this looked from the outside.
+      if (stage.note && S.chaosSkipped.indexOf(stage.note) === -1) {
         S.chaosSkipped = (S.chaosSkipped ? S.chaosSkipped + ' ' : '') + stage.note;
       }
       if (!$('viewDraft').classList.contains('hidden')) renderDraft();

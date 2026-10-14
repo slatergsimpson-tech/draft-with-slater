@@ -442,6 +442,26 @@ remembers the table's usual settings, greets returning names, maybe a
   packs with no stall at all. Worth doing — a plausible cause and a proven one
   are not the same thing, and this file is only useful if it records the
   second kind.
+- [x] **Two prefetches, racing** — 2026-10-13. The fix above caused this one,
+  which is the honest reason to write it down. `startPlay` learned to top up
+  any round the plan was short of; the chaos start path calls `startPlay` and
+  then kicks off a prefetch of its own one line later. Both ran, both with the
+  same starting round, both for the same two rounds. Two symptoms, and he
+  reported both exactly: the "these sets had nothing to open" note was
+  appended twice, so one failure read as two; and the pair raced on the same
+  seat slots, where one run could write a null over cards the other had just
+  fetched. A seat holding null can never be ready, so the round waited for
+  ever — "shuffling up pack 3" that never became P3P1.
+  Runs are chained now rather than allowed to overlap, a round already
+  holding cards is skipped, cards are never traded for a null, and a note is
+  only recorded once. Proven both ways with a harness that drives the real
+  function against a stubbed loader: on the old build each round is fetched
+  twice and the note recorded twice; on this one, once and once.
+  The lesson is about the shape of the mistake, not the mechanism. "Belt and
+  braces" added a second caller to something that was never written to have
+  two, and a background task that silently half-finishes looks exactly like a
+  slow phone. Anything that fills state in the background wants to be
+  single-flight and idempotent from the start.
 - [ ] 3 Discovery log —
 - [ ] 3 Deck card export —
 - [ ] 3 Fantasy dressing —
