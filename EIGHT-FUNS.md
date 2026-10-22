@@ -462,6 +462,42 @@ remembers the table's usual settings, greets returning names, maybe a
   two, and a background task that silently half-finishes looks exactly like a
   slow phone. Anything that fills state in the background wants to be
   single-flight and idempotent from the start.
+- [x] 2 Sensation: **the pack as a rail** — 2026-10-22. Built for video, kept
+  because it is better drafting on a phone anyway. His own diagnosis was the
+  brief: "scrolling up and down, picking the highest rarity card that matches
+  my colors, and just continuing" — a grid of fifteen thumbnails makes the
+  decision invisible, on camera and in the hand. One card at a time, big
+  enough to read, with the next peeking in to say the pack keeps going.
+  Three things argued about and settled. **Not endless**, which is what he
+  first asked for: a pack is fifteen cards and knowing you have seen all of
+  them is the skill, so an infinite loop would hide exactly what a drafter
+  needs. It has ends, a "4 of 15" counter, and the **whole pack one tap
+  away** — the rail serves the viewer, and the grid has to stay for the
+  drafter. **Flick, not step**: native momentum with snap points, because
+  card-by-card stepping would make a forty-five-pick draft longer, and length
+  is the other problem.
+  With it: a lit rare slot (a glow always, a sweep across it only when motion
+  is allowed, so reduced motion still gets a marked card) and the pick
+  travelling to your pool instead of teleporting — the one frame that tells a
+  viewer a decision just happened. Phone only, gated on the media query in
+  both CSS and JS, so the desktop grid is byte-for-byte what it was.
+  It is a layout, not a second renderer: both pack paths build the same cards
+  into the same container and call `applyPackView`, which adds a class and
+  some dressing. Every click handler, long-press sheet and zoom registration
+  carries on working untouched, which is the only reason this was safe to add
+  to the draft loop.
+  *Three CSS traps, all of which looked like the same bug —* every pack
+  opening on its eighth card with the first seven stranded off-screen.
+  A grid item will not shrink below its content unless told to, so the column
+  sized itself to all fifteen cards (4,692px) and the page scrolled sideways
+  instead of the rail. A percentage `flex-basis` on a centring spacer
+  resolves against the flex container's *content* width, not its scrollport,
+  so the leading spacer came out 2,158px wide. And the ≤420px rule centres
+  the pack row — right for a grid, fatal for a scroller, because a centred
+  flex row that overflows spills half its content past the left edge where
+  `scrollLeft` cannot reach it. Worth recording together: all three present
+  as "the rail starts in the wrong place", and only the third was visible
+  from the symptom.
 - [ ] 3 Discovery log —
 - [ ] 3 Deck card export —
 - [ ] 3 Fantasy dressing —

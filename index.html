@@ -104,6 +104,14 @@
   header h1::after{content:''; display:block; height:3px; border-radius:2px; margin-top:3px; background:var(--stripes)}
   header h1 small{display:block; font-family:var(--sans); font-size:11px; color:var(--ink3); letter-spacing:.5px; font-weight:400}
   .spacer{flex:1}
+  /* Phone-only furniture. The rail is a phone layout, so its controls do not
+     exist anywhere else — a desktop has room for the whole pack at once and
+     the rail would be a downgrade there. */
+  .railonly{display:none}
+  /* A grid item will not shrink below its content unless told to, so a rail
+     full of fixed-width cards sized the whole column to its contents instead
+     of scrolling — the page scrolled sideways and the rail never did. */
+  .packcol{min-width:0}
   /* On a wide screen the options are simply always there. */
   #hdrTools{display:flex; align-items:center; gap:12px; flex-wrap:wrap}
   #btnHdrTools{display:none}
@@ -153,6 +161,35 @@
   .packgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--card-w),1fr)); gap:12px}
   .mtgcard{position:relative; border-radius:9px; overflow:hidden; cursor:pointer; background:var(--bg); border:2px solid transparent; transition:transform .12s, border-color .12s; aspect-ratio:488/680}
   .mtgcard img{width:100%; height:100%; display:block; object-fit:cover; position:relative; z-index:1}
+
+  /* The rare slot, lit. Only in the rail, where a card is big enough for it
+     to read as treatment rather than as a rendering fault. The glow is always
+     on; the sweep across it is added only when motion is allowed, so reduced
+     motion still gets a marked card rather than a plain one. */
+  .packrail .mtgcard.rareglow{
+    border-color:rgba(201,162,39,.55);
+    box-shadow:0 0 0 1px rgba(201,162,39,.25), 0 6px 22px -6px rgba(201,162,39,.45);
+  }
+  .packrail .mtgcard.rareglow.mythicglow{
+    border-color:rgba(208,112,74,.6);
+    box-shadow:0 0 0 1px rgba(208,112,74,.28), 0 6px 22px -6px rgba(208,112,74,.5);
+  }
+  .packrail .mtgcard.shiny::after{
+    content:''; position:absolute; inset:0; z-index:3; pointer-events:none;
+    background:linear-gradient(100deg, transparent 38%, rgba(255,255,255,.26) 50%, transparent 62%);
+    transform:translateX(-130%);
+    animation:sheen 3.6s ease-in-out infinite;
+  }
+  @keyframes sheen{ 0%{transform:translateX(-130%)} 55%,100%{transform:translateX(130%)} }
+
+  /* The pick, leaving. A clone flies to the deck button so the card travels
+     to your pool instead of teleporting there — the one frame that tells a
+     viewer a decision just happened. */
+  .pickfly{
+    position:fixed; z-index:95; pointer-events:none; border-radius:9px;
+    overflow:hidden; box-shadow:0 10px 30px -8px rgba(0,0,0,.6);
+    transition:transform .42s cubic-bezier(.4,0,.2,1), opacity .42s ease-in;
+  }
   .mtgcard:hover{transform:translateY(-5px) scale(1.02); border-color:var(--gold); z-index:5}
   .mtgcard.picked{border-color:var(--ok); box-shadow:0 0 0 2px rgba(127,169,107,.45)}
   .mtgcard .fallback{position:absolute; inset:0; z-index:0; display:flex; flex-direction:column; justify-content:center; padding:10px; font-size:11px; text-align:center; color:var(--ink2); background:var(--panel2); border-radius:7px}
@@ -562,6 +599,47 @@
     /* Caps generous enough that the top two size steps still differ; at 30vw
        everything from L upwards collapsed to the same width. */
     .packgrid{grid-template-columns:repeat(auto-fill,minmax(min(60vw,var(--card-w)),1fr)); gap:8px}
+
+    /* ---- the pack as a rail (phones only) ----
+     *
+     * Scrolling a grid of fifteen thumbnails up and down is how you end up
+     * taking the highest rarity that matches your colours without ever
+     * really looking. One card at a time, big enough to read, makes the
+     * decision the thing on screen.
+     *
+     * Deliberately NOT endless: a pack is fifteen cards and knowing you have
+     * seen all of them is the skill. The rail has ends, says where you are,
+     * and the whole pack is one tap away — a rail alone would hide exactly
+     * the information a drafter needs. */
+    .railonly{display:flex}
+    .packbar{display:flex; align-items:center; gap:8px; margin:0 0 8px}
+    .packgrid.packrail{
+      --rail-w:min(78vw, calc(var(--card-w) * 2.1));
+      display:flex; gap:12px; padding:2px 2px 14px;
+      /* The ≤420px grid rule centres its row, which is right for a grid and
+         fatal for a scroller: a centred flex row that overflows spills half
+         its content past the left edge, where scrollLeft cannot reach it.
+         Every pack opened on its eighth card with the first seven stranded
+         off-screen. */
+      justify-content:flex-start;
+      overflow-x:auto; overflow-y:hidden;
+      scroll-snap-type:x mandatory;
+      -webkit-overflow-scrolling:touch;
+      scrollbar-width:none;
+    }
+    .packgrid.packrail::-webkit-scrollbar{display:none}
+    /* Cards snap to the left edge, not the middle.
+     *
+     * Centring wants spacers or padding half a screen wide, and a percentage
+     * flex-basis on a spacer resolves against the flex container's *content*
+     * width — about 4,700px for fifteen cards — so the leading spacer came
+     * out 2,158px wide and every pack opened on its eighth card. Snapping to
+     * the start needs no spacer at all, and leaving the card narrower than
+     * the rail means the next one always peeks in, which is the thing that
+     * tells you the pack keeps going. */
+    .packgrid.packrail .mtgcard{
+      flex:0 0 var(--rail-w); width:var(--rail-w); scroll-snap-align:start;
+    }
     .minigrid{grid-template-columns:repeat(auto-fill,minmax(min(40vw,var(--card-w-sm)),1fr)); gap:7px}
     .sidebar{position:static; max-height:none; margin-top:14px}
     #rulesPanel,#libPanel{width:100%; border-left:none}
@@ -1339,7 +1417,14 @@
     <!-- The deck panel starts open: what you have already taken is the thing
          you most want to see while deciding what to take next. -->
     <div class="draftgrid panel-open" id="draftGrid">
-      <div>
+      <div class="packcol">
+        <!-- Phone only: the pack as a rail you flick through, one big card at
+             a time, with the whole pack always one tap away. -->
+        <div class="packbar railonly">
+          <span class="pill" id="packPos"></span>
+          <span class="spacer"></span>
+          <button class="btn sm" id="btnPackView" aria-pressed="false">Whole pack</button>
+        </div>
         <div class="packgrid" id="packGrid"></div>
       </div>
       <aside class="sidebar">
@@ -8853,6 +8938,151 @@ function startPlay(seedOverride){
   renderDraft();
 }
 
+/* ---------------- the pack as a rail ----------------
+ *
+ * A layout, not a second way of rendering a pack. Both pack renderers — solo
+ * and the relay guest — build the same cards into the same container and then
+ * call applyPackView, which adds a class and some dressing. Keeping it to one
+ * render path is the whole reason this is safe to add: every click handler,
+ * long-press sheet and zoom registration carries on working untouched.
+ *
+ * The rail rules live inside the phone media query, so on a desktop the extra
+ * class does nothing and the grid is exactly what it always was. */
+
+// Rail on a phone, grid everywhere else — and the toggle swaps it either way.
+S.packView = 'rail';
+
+/* The rail is a phone layout, so everything that belongs to it — the lit
+ * rare slot, the card that flies to your pool — is gated on the phone too.
+ * A desktop keeps the grid it always had, untouched. */
+function railActive(){
+  return S.packView === 'rail' && matchMedia('(max-width:720px)').matches;
+}
+
+function railCards(grid){
+  // Pseudo-element spacers are not children, so this is just the cards.
+  return Array.prototype.slice.call(grid.children);
+}
+
+/* Which card is sitting in the middle of the rail right now.
+ *
+ * Measured from where things actually are on screen rather than from
+ * offsetLeft, which is relative to the nearest positioned ancestor and not
+ * to the scroll container — the rail is not positioned, so that arithmetic
+ * silently compared a page coordinate against a scroll offset and reported
+ * the eighth card the moment a pack opened. */
+function railIndex(grid){
+  var box = grid.getBoundingClientRect();
+  var best = 0, bestD = Infinity;
+  railCards(grid).forEach(function(el, i){
+    var d = Math.abs(el.getBoundingClientRect().left - box.left);
+    if (d < bestD) { bestD = d; best = i; }
+  });
+  return best;
+}
+
+function updatePackPos(grid, n){
+  if (!n) { $('packPos').textContent = ''; return; }
+  $('packPos').textContent = S.packView === 'rail'
+    ? (railIndex(grid) + 1) + ' of ' + n
+    : n + ' cards';
+}
+
+/* The chosen card travels to your pool rather than vanishing.
+ *
+ * A clone is flown to the deck button, because the real card is about to be
+ * destroyed by the re-render — the rectangle has to be measured before the
+ * pick is made, which is why this wraps the click rather than following it. */
+function flyToPool(el){
+  if (!motionOK() || !railActive()) return;
+  var from = el.getBoundingClientRect();
+  var target = $('btnToggleDeck');
+  if (!target) return;
+  var to = target.getBoundingClientRect();
+  var ghost = el.cloneNode(true);
+  ghost.className = 'mtgcard pickfly';
+  ghost.style.left = from.left + 'px';
+  ghost.style.top = from.top + 'px';
+  ghost.style.width = from.width + 'px';
+  ghost.style.height = from.height + 'px';
+  document.body.appendChild(ghost);
+  ghost.getBoundingClientRect();        // commit the start state
+  var dx = (to.left + to.width / 2) - (from.left + from.width / 2);
+  var dy = (to.top + to.height / 2) - (from.top + from.height / 2);
+  ghost.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(.12)';
+  ghost.style.opacity = '0';
+  setTimeout(function(){ if (ghost.parentNode) ghost.remove(); }, 480);
+}
+
+function applyPackView(grid, cards){
+  var n = (cards || []).length;
+  grid.classList.toggle('packrail', S.packView === 'rail');
+  $('btnPackView').textContent = S.packView === 'rail' ? 'Whole pack' : 'One at a time';
+  $('btnPackView').setAttribute('aria-pressed', S.packView === 'rail' ? 'false' : 'true');
+
+  railCards(grid).forEach(function(el, i){
+    var c = cards && cards[i];
+    if (!c) return;
+    var r = c.rarity;
+    if (railActive() && (r === 'rare' || r === 'mythic')) {
+      el.classList.add('rareglow');
+      if (r === 'mythic') el.classList.add('mythicglow');
+      // The sweep is motion; the glow is not. Reduced motion keeps the glow.
+      if (motionOK()) el.classList.add('shiny');
+    }
+    /* Wrap the click the renderer already wired, so the card can be measured
+     * while it still exists. Not for a host, whose pick stays in the pack
+     * marked as taken until the table resolves — nothing leaves, so nothing
+     * should fly. */
+    if (!(MP.started && MP.isHost) && el.onclick && !el.__flyWrapped) {
+      el.__flyWrapped = true;
+      var orig = el.onclick;
+      el.onclick = function(e){ flyToPool(el); return orig.call(this, e); };
+    }
+  });
+
+  /* A new pack starts at its first card rather than wherever the last one
+   * was left — scrollLeft survives an innerHTML swap.
+   *
+   * Pinned again on the next frame, which is the part that matters: setting
+   * it during the same tick as the innerHTML swap is too early. A mandatory
+   * snap container re-snaps once the row has been laid out, and a pack was
+   * opening on its eighth card. */
+  if (grid.__packKey !== packKeyOf(cards)) {
+    grid.__packKey = packKeyOf(cards);
+    var pin = function(){
+      grid.scrollLeft = 0;
+      updatePackPos(grid, n);
+    };
+    pin();
+    requestAnimationFrame(pin);
+  }
+  updatePackPos(grid, n);
+}
+
+// Enough to tell one pack from the next without holding on to the cards.
+function packKeyOf(cards){
+  return (cards || []).map(function(c){ return (c && (c.__uid || c.id || c.name)) || '?'; }).join('|');
+}
+
+$('packGrid').addEventListener('scroll', function(){
+  if (S.packView !== 'rail') return;
+  var grid = $('packGrid');
+  updatePackPos(grid, railCards(grid).length);
+}, { passive: true });
+
+$('btnPackView').onclick = function(){
+  S.packView = S.packView === 'rail' ? 'grid' : 'rail';
+  var grid = $('packGrid');
+  var n = railCards(grid).length;
+  grid.classList.toggle('packrail', S.packView === 'rail');
+  $('btnPackView').textContent = S.packView === 'rail' ? 'Whole pack' : 'One at a time';
+  $('btnPackView').setAttribute('aria-pressed', S.packView === 'rail' ? 'false' : 'true');
+  if (S.packView === 'rail') grid.scrollLeft = 0;
+  updatePackPos(grid, n);
+  announce(S.packView === 'rail' ? 'One card at a time' : 'Whole pack');
+};
+
 /* ---------------- cards ---------------- */
 function bigImage(card){
   var src = card.image_uris || (card.card_faces && card.card_faces[0] && card.card_faces[0].image_uris);
@@ -8942,6 +9172,7 @@ function renderGuestDraft(){
     });
     el.onclick = function(){ guestPick(sorted[i]); };
   });
+  applyPackView(grid, sorted);
   renderColourBar('draftColourSlot');
   if (!$('draftPanelSlot').classList.contains('hidden')) {
     mountPanel('draftPanelSlot');
@@ -9292,6 +9523,7 @@ function renderDraft(){
       renderDraft();
     };
   });
+  applyPackView(grid, sorted);
   renderColourBar('draftColourSlot');
   // The deck panel, when open, tracks picks as they land.
   if (!$('draftPanelSlot').classList.contains('hidden')) {
