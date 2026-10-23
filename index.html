@@ -677,17 +677,31 @@
      * after the rail because both classes are on the element and they carry
      * the same specificity. */
     .packgrid.packring{
-      display:block; position:relative; overflow:hidden;
+      display:block; position:relative;
+      /* clip, not hidden: `hidden` still makes a scrollport, and the ring's
+         cards overflow it by design. The browser is then free to scroll that
+         port — which it did, on focus — and because the cards are absolutely
+         positioned inside it, a scrollLeft of 528 dragged the whole ring off
+         the left of the screen. `clip` creates no scrollport to scroll. */
+      overflow:hidden; overflow:clip;
       height:calc(var(--rail-w) * 1.4 + 18px);
       padding:0; gap:0;
       /* Sideways is the ring's; up and down still belongs to the page. */
       touch-action:pan-y;
+      /* Depth is what makes it a ring rather than a mirror. A fan tilted in
+         the plane of the screen is symmetrical about its centre and has no
+         cue for which way is round, so the far side of the pack read as a
+         reflection of the near side. Turning the cards away in perspective
+         gives the two sides somewhere to be. */
+      perspective:1000px;
+      perspective-origin:50% 45%;
     }
     .packgrid.packring .mtgcard{
       position:absolute; left:50%; top:8px;
       width:var(--rail-w); margin-left:calc(var(--rail-w) / -2);
       will-change:transform, opacity;
       transition:none;
+      backface-visibility:hidden;
     }
     .minigrid{grid-template-columns:repeat(auto-fill,minmax(min(40vw,var(--card-w-sm)),1fr)); gap:7px}
     .sidebar{position:static; max-height:none; margin-top:14px}
@@ -9046,6 +9060,9 @@ function ringLayout(grid){
   var n = cards.length;
   if (!n) return;
   var st = ringState(grid);
+  // Belt and braces for browsers without overflow:clip — a scrolled port
+  // moves absolutely positioned children, and the ring lives on those.
+  if (grid.scrollLeft) grid.scrollLeft = 0;
   var w = cards[0].offsetWidth || 240;
   var step = w * 0.46;
   cards.forEach(function(el, i){
@@ -9054,12 +9071,16 @@ function ringLayout(grid){
     d = d - n * Math.round(d / n);
     var ad = Math.abs(d);
     var shown = ad <= 3.6;
+    /* Step sideways, fall away from the viewer, and turn to face the middle.
+     * The turn is the important one: a card angled in depth shows you the
+     * edge that is further round, which is the difference between a wheel
+     * and a mirror. */
     el.style.transform =
       'translateX(' + (d * step).toFixed(1) + 'px) ' +
-      'rotate(' + (d * 5.5).toFixed(2) + 'deg) ' +
-      'scale(' + Math.max(0.56, 1 - ad * 0.135).toFixed(3) + ')';
+      'translateZ(' + (-Math.min(ad, 4) * 78).toFixed(0) + 'px) ' +
+      'rotateY(' + (-d * 21).toFixed(1) + 'deg)';
     el.style.zIndex = String(200 - Math.round(ad * 10));
-    el.style.opacity = shown ? Math.max(0, 1 - ad * 0.2).toFixed(2) : '0';
+    el.style.opacity = shown ? Math.max(0, 1 - ad * 0.17).toFixed(2) : '0';
     el.style.pointerEvents = shown ? 'auto' : 'none';
   });
   grid.__ringFront = ((Math.round(st.pos) % n) + n) % n;

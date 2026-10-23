@@ -531,6 +531,23 @@ remembers the table's usual settings, greets returning names, maybe a
   side brings it to the front instead of taking it, because one tap to draft
   a card you can barely see is how a rare goes to a fat thumb. The long-press
   sheet works everywhere now, which the clone version could never manage.
+  *Same day, from a real draft:* "the last 5 cards in the pack are mirrored of
+  the first 5". The order was not wrong — checked at all fifteen positions,
+  always ascending with a clean wrap — but the *geometry* was. Cards were
+  tilted with an in-plane `rotate`, which is symmetrical about the centre and
+  carries no cue for which way is round, so the far side of the pack read as a
+  reflection of the near side rather than as somewhere else on a ring. Swapped
+  for `rotateY` and `translateZ` under a perspective: the cards now turn away
+  into the screen, which is the difference between a wheel and a mirror.
+  Lesson worth keeping: a layout can be *correct* and still say the wrong
+  thing. Two sides that are geometric reflections of each other will be read
+  as reflections, whatever is printed on them.
+  And a bug the depth exposed: `overflow:hidden` still makes a scrollport, the
+  ring's cards overflow it by design, and the browser is free to scroll that
+  port — which it did, to 528px, dragging every absolutely-positioned card off
+  the left of the screen and leaving the middle empty. `overflow:clip` makes
+  no scrollport at all; `scrollLeft` is also pinned each layout for browsers
+  that lack it.
   Still a toggle, still off by default. The original objection is softened
   rather than gone — the ring does show the whole pack's worth of neighbours
   — but "have I seen all of this" is still a counter question. Verdict after
