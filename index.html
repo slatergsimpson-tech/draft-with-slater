@@ -32,6 +32,15 @@
     --w:#e8dfc8; --u:#8fb6d9; --b:#9b8fa8; --r:#d08a72; --g:#8fb08a; --c:#b8ae9c;
     --ok:#7fa96b; --warn:#c98b3f; --bad:#c9634a;
     --radius:8px;
+    /* The page is served viewport-fit=cover, so it runs under the notch, the
+       home indicator and the rounded corners rather than being letterboxed
+       away from them. That is the right choice for the art band across the
+       top — and it means every edge has to pay the inset back itself, or its
+       controls end up somewhere a thumb cannot reach. */
+    --safe-t:env(safe-area-inset-top, 0px);
+    --safe-b:env(safe-area-inset-bottom, 0px);
+    --safe-l:env(safe-area-inset-left, 0px);
+    --safe-r:env(safe-area-inset-right, 0px);
     --font:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
     --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
     /* Driven by the accessibility controls in the header. */
@@ -42,7 +51,11 @@
   html,body{margin:0;padding:0}
   body{
     background:radial-gradient(1200px 600px at 50% -10%, var(--bg2) 0%, transparent 60%), var(--bg);
-    color:var(--ink); font-family:var(--sans); font-size:14px; line-height:1.55; min-height:100vh;
+    color:var(--ink); font-family:var(--sans); font-size:14px; line-height:1.55;
+    /* 100vh on iOS is the viewport with the toolbars *hidden*, so the last
+       screenful of any page sits under the address bar until you scroll.
+       dvh is the one that tracks what is actually visible. */
+    min-height:100vh; min-height:100dvh;
   }
   /* Light mode: same variables, flipped. */
   [data-mode="light"]{
@@ -97,7 +110,8 @@
     border-bottom:3px solid transparent;
     border-image:var(--stripes) 1;
     background:var(--panel);
-    padding:14px 20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:calc(14px + var(--safe-t)) calc(20px + var(--safe-r)) 14px calc(20px + var(--safe-l));
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
     position:sticky; top:0; z-index:50;
   }
   header h1{font-size:19px; letter-spacing:.3px; color:var(--ink); white-space:nowrap}
@@ -115,7 +129,8 @@
   /* On a wide screen the options are simply always there. */
   #hdrTools{display:flex; align-items:center; gap:12px; flex-wrap:wrap}
   #btnHdrTools{display:none}
-  .wrap{max-width:1560px; margin:0 auto; padding:22px 20px 80px}
+  .wrap{max-width:1560px; margin:0 auto;
+        padding:22px calc(20px + var(--safe-r)) calc(80px + var(--safe-b)) calc(20px + var(--safe-l))}
 
   .sharebox{max-width:1560px; margin:0 auto; padding:10px 20px 0}
   .sharebox input{width:100%; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px}
@@ -293,6 +308,7 @@
   /* Rules reference — a slide-over so it can be read next to whatever screen
    * you were on, without losing a draft. */
   #rulesPanel{position:fixed; top:0; right:0; bottom:0; width:min(460px, 96vw); z-index:300;
+              padding:var(--safe-t) var(--safe-r) var(--safe-b) 0;
               background:var(--panel); border-left:1px solid var(--gold);
               box-shadow:-16px 0 44px rgba(0,0,0,.5); display:flex; flex-direction:column;
               transform:translateX(102%); transition:transform .18s ease}
@@ -417,7 +433,8 @@
   kbd{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.82em; opacity:.65;
       border:1px solid var(--line2); border-radius:3px; padding:0 4px; margin-left:5px}
   .ptbottom{display:grid; grid-template-columns:1fr 230px; gap:14px; align-items:stretch;
-            position:sticky; bottom:0; z-index:30; padding-top:6px; background:var(--bg)}
+            position:sticky; bottom:0; z-index:30; background:var(--bg);
+            padding:6px 0 var(--safe-b)}
   @media(max-width:900px){.ptbottom{grid-template-columns:1fr}}
   .ptbins{display:flex; flex-direction:column; gap:10px}
   .ptbinrow{display:grid; grid-template-columns:1fr 1fr; gap:10px}
@@ -462,6 +479,7 @@
   .ptpile:empty::after{content:'Empty'}
   /* Library browser */
   #libPanel{position:fixed; top:0; right:0; bottom:0; width:min(460px, 96vw); z-index:300;
+            padding:var(--safe-t) var(--safe-r) var(--safe-b) 0;
             background:var(--panel); border-left:1px solid var(--gold);
             box-shadow:-16px 0 44px rgba(0,0,0,.5); display:flex; flex-direction:column}
   #libPanel.hidden{display:none}
@@ -565,7 +583,8 @@
   .hidden{display:none !important}
   .progress{height:5px; background:var(--panel2); border-radius:3px; overflow:hidden; max-width:340px; margin:14px auto 0}
   .progress i{display:block; height:100%; background:var(--stripes); width:0; transition:width .25s}
-  footer{border-top:1px solid var(--line); color:var(--ink3); font-size:11.5px; padding:18px 20px; text-align:center; line-height:1.7}
+  footer{border-top:1px solid var(--line); color:var(--ink3); font-size:11.5px; text-align:center; line-height:1.7;
+         padding:18px calc(20px + var(--safe-r)) calc(18px + var(--safe-b)) calc(20px + var(--safe-l))}
   .cmdrpick{display:flex; gap:10px; overflow-x:auto; padding-bottom:6px}
   .cmdrpick .mtgcard{width:110px; flex:0 0 auto}
   .cmdrpick .mtgcard.on{border-color:var(--gold); box-shadow:0 0 0 3px rgba(201,162,39,.4)}
@@ -577,7 +596,12 @@
    * cards. */
   @media(max-width:720px){
     body{font-size:15px}
-    header{padding:10px 12px; gap:8px}
+    /* The phone overrides have to pay the insets back too — this is the
+       breakpoint where the notch and the home indicator actually exist, and
+       a flat 10px here was putting the header's buttons under the status
+       bar on any phone with one. */
+    header{padding:calc(10px + var(--safe-t)) calc(12px + var(--safe-r)) 10px calc(12px + var(--safe-l));
+           gap:8px}
     header h1{font-size:16px}
     header h1 small{display:none}
     /* Appearance controls collapse behind a toggle: on a phone the header is
@@ -585,7 +609,7 @@
     #hdrTools{display:none; order:99; width:100%; flex-wrap:wrap; gap:8px}
     #hdrTools.on{display:flex}
     #btnHdrTools{display:inline-flex}
-    .wrap{padding:14px 12px 90px}
+    .wrap{padding:14px calc(12px + var(--safe-r)) calc(90px + var(--safe-b)) calc(12px + var(--safe-l))}
     .sharebox{padding:8px 12px 0}
     .card-panel{padding:14px}
     .btn{padding:10px 14px; min-height:44px}
@@ -669,7 +693,7 @@
     .storybox.shotbox{padding:16px 12px}
     /* Piles scroll sideways rather than squeezing to nothing. */
     .piles{gap:8px}
-    footer{padding:18px 12px 40px}
+    footer{padding:18px calc(12px + var(--safe-r)) calc(40px + var(--safe-b)) calc(12px + var(--safe-l))}
   }
   @media(max-width:420px){
     /* Three across: with hold-to-read there is no need for a card to be big
@@ -704,7 +728,9 @@
 
   /* ---- the story of your draft (post-draft recap) ---- */
   .storyback{position:fixed; inset:0; z-index:80; background:rgba(0,0,0,.55)}
-  .storyover{position:fixed; inset:0; z-index:81; overflow-y:auto; padding:4vh 14px 8vh}
+  .storyover{position:fixed; inset:0; z-index:81; overflow-y:auto;
+             padding:calc(4vh + var(--safe-t)) calc(14px + var(--safe-r))
+                     calc(8vh + var(--safe-b)) calc(14px + var(--safe-l))}
   .storybox{max-width:980px; margin:0 auto; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:26px 28px}
   .storyhead{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:6px}
   .storyhead h2{font-size:24px}

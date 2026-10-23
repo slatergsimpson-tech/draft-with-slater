@@ -521,6 +521,29 @@ remembers the table's usual settings, greets returning names, maybe a
   carry the long-press sheet, so holding one to zoom does nothing. If it
   survives a draft night that gets fixed properly; if it does not, it comes
   out. Verdict after he records on it.
+- [x] **The edges of the screen were unreachable** — 2026-10-23. Reported as
+  "the margins at the top and bottom are not really reachable — I have to
+  zoom way in using pinch and then pan over to hit the button", which is a
+  phone describing a notch. The page is served `viewport-fit=cover`, which is
+  the right call — the art band wants to run under the status bar rather than
+  be letterboxed away from it — but that bargain means every edge has to pay
+  the inset back itself. Only two elements ever did: the card sheet and the
+  jump-to-end buttons. The header, the content wrapper, the footer, the
+  playtester's sticky bar, both side panels and the story overlay did not, so
+  on any phone with a notch or a home indicator their controls sat underneath
+  the system UI. Options and Rules — the two most-used buttons in the app —
+  were among them.
+  Named insets now, applied at every edge, and `min-height` moved to `dvh`:
+  `100vh` on iOS is the viewport with the toolbars *hidden*, so the last
+  screenful of every page sat under the address bar until you scrolled.
+  Checked both ways, because a fix for a device nobody here has is easy to
+  get backwards: at zero insets every measurement is identical to before, and
+  with a Dynamic Island and home indicator simulated (59px and 34px) the
+  header's padding goes 10px to 69px, every visible header button clears the
+  notch, and the footer and wrapper grow by exactly the bottom inset. The
+  phone breakpoint needed fixing separately — it overrides the header and
+  footer padding with flat values, so the base rules alone changed nothing
+  where it actually mattered.
 - [ ] 3 Discovery log —
 - [ ] 3 Deck card export —
 - [ ] 3 Fantasy dressing —
