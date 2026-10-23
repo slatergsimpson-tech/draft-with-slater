@@ -669,6 +669,26 @@
     .packgrid.packrail .mtgcard{
       flex:0 0 var(--rail-w); width:var(--rail-w); scroll-snap-align:center;
     }
+
+    /* ---- the pack as a ring ----
+     * Same cards, placed by transform instead of by the scroller. No copies:
+     * each card appears exactly once, wherever its distance from the front
+     * puts it, and the far side of the pack is also the near side. Declared
+     * after the rail because both classes are on the element and they carry
+     * the same specificity. */
+    .packgrid.packring{
+      display:block; position:relative; overflow:hidden;
+      height:calc(var(--rail-w) * 1.4 + 18px);
+      padding:0; gap:0;
+      /* Sideways is the ring's; up and down still belongs to the page. */
+      touch-action:pan-y;
+    }
+    .packgrid.packring .mtgcard{
+      position:absolute; left:50%; top:8px;
+      width:var(--rail-w); margin-left:calc(var(--rail-w) / -2);
+      will-change:transform, opacity;
+      transition:none;
+    }
     .minigrid{grid-template-columns:repeat(auto-fill,minmax(min(40vw,var(--card-w-sm)),1fr)); gap:7px}
     .sidebar{position:static; max-height:none; margin-top:14px}
     #rulesPanel,#libPanel{width:100%; border-left:none}
@@ -1454,7 +1474,7 @@
         <div class="packbar railonly">
           <span class="pill" id="packPos"></span>
           <span class="spacer"></span>
-          <button class="btn sm" id="btnPackLoop" aria-pressed="false">Spin</button>
+          <button class="btn sm" id="btnPackLoop" aria-pressed="false">Ring</button>
           <button class="btn sm" id="btnPackView" aria-pressed="false">Whole pack</button>
         </div>
         <div class="packgrid" id="packGrid"></div>
@@ -8983,7 +9003,7 @@ function startPlay(seedOverride){
 
 // Rail on a phone, grid everywhere else — and the toggle swaps it either way.
 S.packView = 'rail';
-S.packLoop = false;
+S.packRing = false;
 
 /* The rail is a phone layout, so everything that belongs to it — the lit
  * rare slot, the card that flies to your pool — is gated on the phone too.
@@ -8992,64 +9012,155 @@ function railActive(){
   return S.packView === 'rail' && matchMedia('(max-width:720px)').matches;
 }
 
+function ringActive(){ return S.packRing && railActive(); }
+
 function railCards(grid){
   return Array.prototype.slice.call(grid.children);
 }
 
-/* Spinning the pack: the last card joined to the first.
+/* Spinning the pack: an actual ring.
  *
- * Done the way carousels are done — the pack is laid out three times and the
- * scroll position is quietly moved a set back or forward whenever it drifts
- * out of the middle copy, so there is always a card either side and the rail
- * never reaches an end.
+ * The first attempt faked one by laying the pack out three times and sliding
+ * the scroll back a set whenever it drifted — and the duplicates were the
+ * whole problem. Opening a pack put identical cards either side of the first
+ * one, and going backwards walked you into a copy of a card you had already
+ * passed. A strip pretending to be a ring tells you a lie about how many
+ * cards there are, which is the one thing a pack must not do.
  *
- * Off by default, and a toggle rather than a replacement, because it costs
- * something real: a pack with no ends makes "have I seen all of this" a
- * question you have to answer from the counter rather than from the rail.
- * Worth having to try; not obviously worth keeping.
+ * So: no copies. Every card exists once, and its place is worked out from how
+ * far it sits from the front, wrapped into [-n/2, n/2). Card fourteen of
+ * fifteen is simply one step to the *left* of card zero, because on a ring
+ * that is where it is. Spin far enough and you come back round to where you
+ * started, having passed each card exactly once.
  *
- * The copies are clones, so they carry the picture and the click but not the
- * long-press sheet, which is registered per element. Holding a clone to zoom
- * does nothing — the middle copy is the real one. */
-var RAIL_COPIES = 3;
-
-function buildLoop(grid){
-  var real = railCards(grid).filter(function(el){ return !el.__railClone; });
-  var n = real.length;
-  if (n < 3) return;
-  for (var copy = 0; copy < RAIL_COPIES - 1; copy++) {
-    real.forEach(function(el){
-      var c = el.cloneNode(true);
-      c.__railClone = true;
-      c.setAttribute('aria-hidden', 'true');
-      c.tabIndex = -1;
-      // cloneNode copies attributes, not properties: the handler is ours to
-      // carry across, and it is the same card either way.
-      c.onclick = el.onclick;
-      grid.appendChild(c);
-    });
-  }
-  // Re-order to [copy][real][copy] so the real cards sit in the middle.
-  var all = railCards(grid);
-  var tail = all.slice(n * 2);
-  tail.forEach(function(el){ grid.insertBefore(el, grid.firstChild); });
-  grid.__loopN = n;
+ * Laid out as a fan rather than in perspective: cards step sideways, tilt a
+ * little and shrink with distance, which reads as a wheel seen face-on and
+ * costs one transform per card. */
+function ringState(grid){
+  if (!grid.__ring) grid.__ring = { pos: 0, anim: 0, drag: null, moved: false };
+  return grid.__ring;
 }
 
-function loopSetWidth(grid){
-  var kids = railCards(grid);
-  var n = grid.__loopN;
-  if (!n || kids.length < n * 2) return 0;
-  return kids[n].getBoundingClientRect().left - kids[0].getBoundingClientRect().left;
+function ringLayout(grid){
+  var cards = railCards(grid);
+  var n = cards.length;
+  if (!n) return;
+  var st = ringState(grid);
+  var w = cards[0].offsetWidth || 240;
+  var step = w * 0.46;
+  cards.forEach(function(el, i){
+    var d = i - st.pos;
+    // The ring, in one line: the far side of the pack is also the near side.
+    d = d - n * Math.round(d / n);
+    var ad = Math.abs(d);
+    var shown = ad <= 3.6;
+    el.style.transform =
+      'translateX(' + (d * step).toFixed(1) + 'px) ' +
+      'rotate(' + (d * 5.5).toFixed(2) + 'deg) ' +
+      'scale(' + Math.max(0.56, 1 - ad * 0.135).toFixed(3) + ')';
+    el.style.zIndex = String(200 - Math.round(ad * 10));
+    el.style.opacity = shown ? Math.max(0, 1 - ad * 0.2).toFixed(2) : '0';
+    el.style.pointerEvents = shown ? 'auto' : 'none';
+  });
+  grid.__ringFront = ((Math.round(st.pos) % n) + n) % n;
 }
 
-// Keep the scroll inside the middle copy, so neither end is ever reached.
-function keepLooping(grid){
-  var setW = grid.__loopSetW || 0;
-  if (!setW) return;
-  var x = grid.scrollLeft;
-  if (x < setW * 0.5) grid.scrollLeft = x + setW;
-  else if (x > setW * 1.5) grid.scrollLeft = x - setW;
+/* The shorter way round to a card. Spinning anticlockwise past the end to
+ * reach card one is the whole point of a ring; going the long way round
+ * would look like the thing bouncing back. */
+function nearestTurn(grid, i){
+  var st = ringState(grid), n = railCards(grid).length;
+  if (!n) return i;
+  var d = i - st.pos;
+  d = d - n * Math.round(d / n);
+  return st.pos + d;
+}
+
+/* Put the cards back the way the grid expects to find them.
+ *
+ * The ring places cards with inline transforms, and inline styles outlive a
+ * media query: turning the ring off, or simply widening the window past the
+ * phone breakpoint, left fifteen cards still translated hundreds of pixels
+ * sideways inside a grid that had gone back to laying them out itself. The
+ * desktop page scrolled sideways and nothing on screen explained why. */
+function ringClear(grid){
+  railCards(grid).forEach(function(el){
+    el.style.transform = '';
+    el.style.zIndex = '';
+    el.style.opacity = '';
+    el.style.pointerEvents = '';
+  });
+}
+
+// Ease to a card rather than snapping, so a flick reads as a spin slowing.
+function ringGlide(grid, to){
+  var st = ringState(grid);
+  cancelAnimationFrame(st.anim);
+  var from = st.pos, t0 = 0, ms = 320;
+  var tick = function(now){
+    if (!t0) t0 = now;
+    var k = Math.min(1, (now - t0) / ms);
+    var e = 1 - Math.pow(1 - k, 3);
+    st.pos = from + (to - from) * e;
+    ringLayout(grid);
+    updatePackPos(grid, railCards(grid).length);
+    if (k < 1) st.anim = requestAnimationFrame(tick);
+    else { st.pos = to; ringLayout(grid); }
+  };
+  st.anim = requestAnimationFrame(tick);
+}
+
+/* Dragging the ring round. Deliberately only takes over once the finger has
+ * clearly moved sideways, so a straight-down swipe still scrolls the page and
+ * a press-and-hold still opens the card sheet. */
+function ringBindDrag(grid){
+  if (grid.__ringBound) return;
+  grid.__ringBound = true;
+  var st = function(){ return ringState(grid); };
+
+  grid.addEventListener('pointerdown', function(e){
+    if (!ringActive()) return;
+    var s = st();
+    cancelAnimationFrame(s.anim);
+    s.drag = { x: e.clientX, y: e.clientY, from: s.pos, id: e.pointerId,
+               last: e.clientX, t: performance.now(), v: 0, on: false };
+    s.moved = false;
+  });
+
+  grid.addEventListener('pointermove', function(e){
+    var s = st();
+    if (!s.drag || e.pointerId !== s.drag.id) return;
+    var dx = e.clientX - s.drag.x, dy = e.clientY - s.drag.y;
+    if (!s.drag.on) {
+      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
+      s.drag.on = true;
+      s.moved = true;
+      try { grid.setPointerCapture(s.drag.id); } catch (err) {}
+    }
+    var cards = railCards(grid);
+    var w = (cards[0] && cards[0].offsetWidth) || 240;
+    var now = performance.now(), dt = Math.max(1, now - s.drag.t);
+    s.drag.v = (e.clientX - s.drag.last) / dt;
+    s.drag.last = e.clientX; s.drag.t = now;
+    s.pos = s.drag.from - dx / (w * 0.46);
+    ringLayout(grid);
+    updatePackPos(grid, cards.length);
+  });
+
+  var release = function(e){
+    var s = st();
+    if (!s.drag || (e && e.pointerId !== s.drag.id)) return;
+    var on = s.drag.on, v = s.drag.v;
+    s.drag = null;
+    if (!on) return;
+    var cards = railCards(grid);
+    var w = (cards[0] && cards[0].offsetWidth) || 240;
+    // A flick carries on a little; without this the ring stops dead.
+    var carry = -v * 140 / (w * 0.46);
+    ringGlide(grid, Math.round(s.pos + Math.max(-4, Math.min(4, carry))));
+  };
+  grid.addEventListener('pointerup', release);
+  grid.addEventListener('pointercancel', release);
 }
 
 /* Which card is sitting in the middle of the rail right now.
@@ -9074,9 +9185,8 @@ function railIndex(grid){
 function updatePackPos(grid, n){
   if (!n) { $('packPos').textContent = ''; return; }
   if (S.packView !== 'rail') { $('packPos').textContent = n + ' cards'; return; }
-  // Spinning lays the pack out three times; the counter still means the pack.
-  var i = railIndex(grid);
-  $('packPos').textContent = ((grid.__loopN ? i % grid.__loopN : i) + 1) + ' of ' + n;
+  var i = ringActive() ? (grid.__ringFront || 0) : railIndex(grid);
+  $('packPos').textContent = (i + 1) + ' of ' + n;
 }
 
 /* The chosen card travels to your pool rather than vanishing.
@@ -9128,7 +9238,22 @@ function applyPackView(grid, cards){
     if (!(MP.started && MP.isHost) && el.onclick && !el.__flyWrapped) {
       el.__flyWrapped = true;
       var orig = el.onclick;
-      el.onclick = function(e){ flyToPool(el); return orig.call(this, e); };
+      el.onclick = function(e){
+        /* A spin ends with the finger lifting over a card, which is a click
+         * as far as the browser is concerned. Swallow it, or every flick
+         * drafts something. */
+        var st = grid.__ring;
+        if (st && st.moved) { st.moved = false; return; }
+        /* On the ring, tapping a card off to the side brings it to the front
+         * rather than taking it. Two taps to draft a card you can barely see
+         * is the right number — one is how you lose a rare to a fat thumb. */
+        if (ringActive() && grid.__ringFront !== i) {
+          ringGlide(grid, nearestTurn(grid, i));
+          return;
+        }
+        flyToPool(el);
+        return orig.call(this, e);
+      };
     }
   });
 
@@ -9139,31 +9264,26 @@ function applyPackView(grid, cards){
    * it during the same tick as the innerHTML swap is too early. A mandatory
    * snap container re-snaps once the row has been laid out, and a pack was
    * opening on its eighth card. */
-  grid.__loopN = 0;
-  grid.__loopSetW = 0;
-  if (S.packLoop && railActive() && n >= 3) {
-    buildLoop(grid);
-    /* Measured here as well as in the pin below, because applyPackView runs
-     * on every redraw — opening the deck panel, a colour bar refresh — and
-     * those redraws do not re-pin. Leaving the set width at zero until the
-     * next new pack would quietly stop the rail looping at all. */
-    grid.__loopSetW = loopSetWidth(grid);
-  }
+  var ring = ringActive() && n >= 3;
+  grid.classList.toggle('packring', ring);
+  if (ring) ringBindDrag(grid); else ringClear(grid);
 
-  if (grid.__packKey !== packKeyOf(cards) || grid.__loopWas !== !!grid.__loopN) {
+  /* A new pack starts at its first card rather than wherever the last one
+   * was left. The ring is laid out again on the next frame too: the cards
+   * have to have been measured before their places can be worked out. */
+  if (grid.__packKey !== packKeyOf(cards) || grid.__ringWas !== ring) {
     grid.__packKey = packKeyOf(cards);
-    grid.__loopWas = !!grid.__loopN;
+    grid.__ringWas = ring;
+    if (ring) ringState(grid).pos = 0;
     var pin = function(){
-      if (grid.__loopN) {
-        grid.__loopSetW = loopSetWidth(grid);
-        grid.scrollLeft = grid.__loopSetW;      // park in the middle copy
-      } else {
-        grid.scrollLeft = 0;
-      }
+      if (ring) ringLayout(grid);
+      else grid.scrollLeft = 0;
       updatePackPos(grid, n);
     };
     pin();
     requestAnimationFrame(pin);
+  } else if (ring) {
+    ringLayout(grid);
   }
   updatePackPos(grid, n);
 }
@@ -9176,16 +9296,37 @@ function packKeyOf(cards){
 $('packGrid').addEventListener('scroll', function(){
   if (S.packView !== 'rail') return;
   var grid = $('packGrid');
-  keepLooping(grid);
-  updatePackPos(grid, grid.__loopN || railCards(grid).length);
+  if (ringActive()) return;              // the ring moves by transform, not scroll
+  updatePackPos(grid, railCards(grid).length);
 }, { passive: true });
 
+/* The rail and the ring are phone layouts chosen by a media query, and
+ * nothing re-renders the pack when a window is resized across it. Rotating a
+ * phone, or dragging a desktop window narrow, would otherwise leave the pack
+ * in whichever shape it had when it was dealt. */
+var packViewResize = null;
+window.addEventListener('resize', function(){
+  clearTimeout(packViewResize);
+  packViewResize = setTimeout(function(){
+    if ($('viewDraft').classList.contains('hidden')) return;
+    var grid = $('packGrid');
+    var n = railCards(grid).length;
+    if (!n) return;
+    var ring = ringActive() && n >= 3;
+    grid.classList.toggle('packrail', S.packView === 'rail');
+    grid.classList.toggle('packring', ring);
+    if (ring) { ringBindDrag(grid); ringLayout(grid); }
+    else { ringClear(grid); grid.scrollLeft = 0; }
+    updatePackPos(grid, n);
+  }, 180);
+});
+
 $('btnPackLoop').onclick = function(){
-  S.packLoop = !S.packLoop;
-  $('btnPackLoop').textContent = S.packLoop ? 'Spin: on' : 'Spin';
-  $('btnPackLoop').setAttribute('aria-pressed', S.packLoop ? 'true' : 'false');
-  announce(S.packLoop ? 'The pack spins — the last card joins the first'
-                      : 'The pack has ends again');
+  S.packRing = !S.packRing;
+  $('btnPackLoop').textContent = S.packRing ? 'Ring: on' : 'Ring';
+  $('btnPackLoop').setAttribute('aria-pressed', S.packRing ? 'true' : 'false');
+  announce(S.packRing ? 'The pack is a ring — spin it round'
+                      : 'The pack is a rail again');
   renderDraft();
 };
 

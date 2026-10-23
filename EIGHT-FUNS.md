@@ -510,17 +510,31 @@ remembers the table's usual settings, greets returning names, maybe a
   **Scroll too slow**: `scroll-snap-type` was `mandatory`, which catches every
   flick on the very next card. Proximity lets a hard swipe cross half a pack
   and still settle on a card.
-  **Spin** — the last card joined to the first — which he asked to *see*
-  after I argued against it. Built as a toggle rather than a replacement so
-  it can be compared: the pack is laid out three times and the scroll is
-  quietly moved a set back or forward whenever it leaves the middle copy.
-  Off by default. The objection still stands and is now visible rather than
-  theoretical: a pack with no ends makes "have I seen all of this" a question
-  you answer from the counter instead of from the rail. The counter cycles
-  1–15 correctly and picking a clone picks the real card, but a clone cannot
-  carry the long-press sheet, so holding one to zoom does nothing. If it
-  survives a draft night that gets fixed properly; if it does not, it comes
-  out. Verdict after he records on it.
+  **Spin**, which he asked to see after I argued against it. First attempt
+  faked a ring by laying the pack out three times and sliding the scroll back
+  a set whenever it drifted — and the duplicates *were* the problem, exactly
+  as he then reported: opening a pack put identical cards either side of the
+  first one, and going backwards walked into a copy of a card already passed.
+  **Rebuilt as an actual ring**, 2026-10-23, after he said he had pictured a
+  circle rather than a strip. No copies at all now: every card exists once
+  and its place comes from how far it sits from the front, wrapped into
+  [-n/2, n/2), so card fifteen is simply one step to the *left* of card one —
+  because on a ring that is where it is. Measured: fifteen cards, fifteen
+  distinct names, and the cards either side of the front read 13, 14, 15, 1,
+  2, 3, 4. Laid out as a fan — step sideways, tilt, shrink with distance —
+  which is one transform per card and reads as a wheel seen face-on. Dragged
+  by pointer with a flick that carries, and it only takes the gesture once
+  the finger has clearly gone sideways, so a downward swipe still scrolls the
+  page and a press-and-hold still opens the card sheet.
+  Two interaction rules worth keeping: the click that ends a flick is
+  swallowed, or every spin drafts something; and tapping a card off to the
+  side brings it to the front instead of taking it, because one tap to draft
+  a card you can barely see is how a rare goes to a fat thumb. The long-press
+  sheet works everywhere now, which the clone version could never manage.
+  Still a toggle, still off by default. The original objection is softened
+  rather than gone — the ring does show the whole pack's worth of neighbours
+  — but "have I seen all of this" is still a counter question. Verdict after
+  he records on it.
 - [x] **The edges of the screen were unreachable** — 2026-10-23. Reported as
   "the margins at the top and bottom are not really reachable — I have to
   zoom way in using pinch and then pan over to hit the button", which is a
