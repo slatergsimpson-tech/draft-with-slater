@@ -498,6 +498,29 @@ remembers the table's usual settings, greets returning names, maybe a
   `scrollLeft` cannot reach it. Worth recording together: all three present
   as "the rail starts in the wrong place", and only the third was visible
   from the symptom.
+- [~] 2 Rail, second pass — 2026-10-23. Three notes from drafting on it.
+  **Cards a little too large**, and the Options size control did not help:
+  shrinking the card made the *next* one loom, because start-snapping put the
+  whole leftover on one side. Now the card is smaller by default and the rail
+  is centred, with the leftover split evenly — so a smaller card reads as
+  more room rather than more crowding, and the size control finally does what
+  you would expect. (Centring works this time because percentage *padding*
+  resolves against the scrollport, unlike the percentage flex-basis on a
+  spacer that made it 2,158px wide on the first attempt.)
+  **Scroll too slow**: `scroll-snap-type` was `mandatory`, which catches every
+  flick on the very next card. Proximity lets a hard swipe cross half a pack
+  and still settle on a card.
+  **Spin** — the last card joined to the first — which he asked to *see*
+  after I argued against it. Built as a toggle rather than a replacement so
+  it can be compared: the pack is laid out three times and the scroll is
+  quietly moved a set back or forward whenever it leaves the middle copy.
+  Off by default. The objection still stands and is now visible rather than
+  theoretical: a pack with no ends makes "have I seen all of this" a question
+  you answer from the counter instead of from the rail. The counter cycles
+  1–15 correctly and picking a clone picks the real card, but a clone cannot
+  carry the long-press sheet, so holding one to zoom does nothing. If it
+  survives a draft night that gets fixed properly; if it does not, it comes
+  out. Verdict after he records on it.
 - [ ] 3 Discovery log —
 - [ ] 3 Deck card export —
 - [ ] 3 Fantasy dressing —

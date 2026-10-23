@@ -614,7 +614,7 @@
     .railonly{display:flex}
     .packbar{display:flex; align-items:center; gap:8px; margin:0 0 8px}
     .packgrid.packrail{
-      --rail-w:min(78vw, calc(var(--card-w) * 2.1));
+      --rail-w:min(70vw, calc(var(--card-w) * 1.8));
       display:flex; gap:12px; padding:2px 2px 14px;
       /* The ≤420px grid rule centres its row, which is right for a grid and
          fatal for a scroller: a centred flex row that overflows spills half
@@ -622,23 +622,28 @@
          Every pack opened on its eighth card with the first seven stranded
          off-screen. */
       justify-content:flex-start;
+      /* Centred, with the leftover split evenly either side.
+       *
+       * Start-snapping put the whole gap on one side, so shrinking the card
+       * in Options made the next card loom rather than making the current
+       * one calmer. Split in two, the neighbours sit back as slivers and a
+       * smaller card reads as more room rather than more crowding.
+       *
+       * Percentage *padding* resolves against the containing block, which is
+       * the scrollport — unlike the percentage flex-basis on a spacer that
+       * made this 2,158px wide the first time around. */
+      padding-inline:calc((100% - var(--rail-w)) / 2);
       overflow-x:auto; overflow-y:hidden;
-      scroll-snap-type:x mandatory;
+      /* Proximity, not mandatory. Mandatory catches every flick on the very
+         next card, which is what made the rail feel slow — a hard swipe
+         should be able to cross half a pack. */
+      scroll-snap-type:x proximity;
       -webkit-overflow-scrolling:touch;
       scrollbar-width:none;
     }
     .packgrid.packrail::-webkit-scrollbar{display:none}
-    /* Cards snap to the left edge, not the middle.
-     *
-     * Centring wants spacers or padding half a screen wide, and a percentage
-     * flex-basis on a spacer resolves against the flex container's *content*
-     * width — about 4,700px for fifteen cards — so the leading spacer came
-     * out 2,158px wide and every pack opened on its eighth card. Snapping to
-     * the start needs no spacer at all, and leaving the card narrower than
-     * the rail means the next one always peeks in, which is the thing that
-     * tells you the pack keeps going. */
     .packgrid.packrail .mtgcard{
-      flex:0 0 var(--rail-w); width:var(--rail-w); scroll-snap-align:start;
+      flex:0 0 var(--rail-w); width:var(--rail-w); scroll-snap-align:center;
     }
     .minigrid{grid-template-columns:repeat(auto-fill,minmax(min(40vw,var(--card-w-sm)),1fr)); gap:7px}
     .sidebar{position:static; max-height:none; margin-top:14px}
@@ -1423,6 +1428,7 @@
         <div class="packbar railonly">
           <span class="pill" id="packPos"></span>
           <span class="spacer"></span>
+          <button class="btn sm" id="btnPackLoop" aria-pressed="false">Spin</button>
           <button class="btn sm" id="btnPackView" aria-pressed="false">Whole pack</button>
         </div>
         <div class="packgrid" id="packGrid"></div>
@@ -8951,6 +8957,7 @@ function startPlay(seedOverride){
 
 // Rail on a phone, grid everywhere else — and the toggle swaps it either way.
 S.packView = 'rail';
+S.packLoop = false;
 
 /* The rail is a phone layout, so everything that belongs to it — the lit
  * rare slot, the card that flies to your pool — is gated on the phone too.
@@ -8960,8 +8967,63 @@ function railActive(){
 }
 
 function railCards(grid){
-  // Pseudo-element spacers are not children, so this is just the cards.
   return Array.prototype.slice.call(grid.children);
+}
+
+/* Spinning the pack: the last card joined to the first.
+ *
+ * Done the way carousels are done — the pack is laid out three times and the
+ * scroll position is quietly moved a set back or forward whenever it drifts
+ * out of the middle copy, so there is always a card either side and the rail
+ * never reaches an end.
+ *
+ * Off by default, and a toggle rather than a replacement, because it costs
+ * something real: a pack with no ends makes "have I seen all of this" a
+ * question you have to answer from the counter rather than from the rail.
+ * Worth having to try; not obviously worth keeping.
+ *
+ * The copies are clones, so they carry the picture and the click but not the
+ * long-press sheet, which is registered per element. Holding a clone to zoom
+ * does nothing — the middle copy is the real one. */
+var RAIL_COPIES = 3;
+
+function buildLoop(grid){
+  var real = railCards(grid).filter(function(el){ return !el.__railClone; });
+  var n = real.length;
+  if (n < 3) return;
+  for (var copy = 0; copy < RAIL_COPIES - 1; copy++) {
+    real.forEach(function(el){
+      var c = el.cloneNode(true);
+      c.__railClone = true;
+      c.setAttribute('aria-hidden', 'true');
+      c.tabIndex = -1;
+      // cloneNode copies attributes, not properties: the handler is ours to
+      // carry across, and it is the same card either way.
+      c.onclick = el.onclick;
+      grid.appendChild(c);
+    });
+  }
+  // Re-order to [copy][real][copy] so the real cards sit in the middle.
+  var all = railCards(grid);
+  var tail = all.slice(n * 2);
+  tail.forEach(function(el){ grid.insertBefore(el, grid.firstChild); });
+  grid.__loopN = n;
+}
+
+function loopSetWidth(grid){
+  var kids = railCards(grid);
+  var n = grid.__loopN;
+  if (!n || kids.length < n * 2) return 0;
+  return kids[n].getBoundingClientRect().left - kids[0].getBoundingClientRect().left;
+}
+
+// Keep the scroll inside the middle copy, so neither end is ever reached.
+function keepLooping(grid){
+  var setW = grid.__loopSetW || 0;
+  if (!setW) return;
+  var x = grid.scrollLeft;
+  if (x < setW * 0.5) grid.scrollLeft = x + setW;
+  else if (x > setW * 1.5) grid.scrollLeft = x - setW;
 }
 
 /* Which card is sitting in the middle of the rail right now.
@@ -8973,9 +9035,11 @@ function railCards(grid){
  * the eighth card the moment a pack opened. */
 function railIndex(grid){
   var box = grid.getBoundingClientRect();
+  var mid = box.left + box.width / 2;
   var best = 0, bestD = Infinity;
   railCards(grid).forEach(function(el, i){
-    var d = Math.abs(el.getBoundingClientRect().left - box.left);
+    var r = el.getBoundingClientRect();
+    var d = Math.abs((r.left + r.width / 2) - mid);
     if (d < bestD) { bestD = d; best = i; }
   });
   return best;
@@ -8983,9 +9047,10 @@ function railIndex(grid){
 
 function updatePackPos(grid, n){
   if (!n) { $('packPos').textContent = ''; return; }
-  $('packPos').textContent = S.packView === 'rail'
-    ? (railIndex(grid) + 1) + ' of ' + n
-    : n + ' cards';
+  if (S.packView !== 'rail') { $('packPos').textContent = n + ' cards'; return; }
+  // Spinning lays the pack out three times; the counter still means the pack.
+  var i = railIndex(grid);
+  $('packPos').textContent = ((grid.__loopN ? i % grid.__loopN : i) + 1) + ' of ' + n;
 }
 
 /* The chosen card travels to your pool rather than vanishing.
@@ -9048,10 +9113,27 @@ function applyPackView(grid, cards){
    * it during the same tick as the innerHTML swap is too early. A mandatory
    * snap container re-snaps once the row has been laid out, and a pack was
    * opening on its eighth card. */
-  if (grid.__packKey !== packKeyOf(cards)) {
+  grid.__loopN = 0;
+  grid.__loopSetW = 0;
+  if (S.packLoop && railActive() && n >= 3) {
+    buildLoop(grid);
+    /* Measured here as well as in the pin below, because applyPackView runs
+     * on every redraw — opening the deck panel, a colour bar refresh — and
+     * those redraws do not re-pin. Leaving the set width at zero until the
+     * next new pack would quietly stop the rail looping at all. */
+    grid.__loopSetW = loopSetWidth(grid);
+  }
+
+  if (grid.__packKey !== packKeyOf(cards) || grid.__loopWas !== !!grid.__loopN) {
     grid.__packKey = packKeyOf(cards);
+    grid.__loopWas = !!grid.__loopN;
     var pin = function(){
-      grid.scrollLeft = 0;
+      if (grid.__loopN) {
+        grid.__loopSetW = loopSetWidth(grid);
+        grid.scrollLeft = grid.__loopSetW;      // park in the middle copy
+      } else {
+        grid.scrollLeft = 0;
+      }
       updatePackPos(grid, n);
     };
     pin();
@@ -9068,8 +9150,18 @@ function packKeyOf(cards){
 $('packGrid').addEventListener('scroll', function(){
   if (S.packView !== 'rail') return;
   var grid = $('packGrid');
-  updatePackPos(grid, railCards(grid).length);
+  keepLooping(grid);
+  updatePackPos(grid, grid.__loopN || railCards(grid).length);
 }, { passive: true });
+
+$('btnPackLoop').onclick = function(){
+  S.packLoop = !S.packLoop;
+  $('btnPackLoop').textContent = S.packLoop ? 'Spin: on' : 'Spin';
+  $('btnPackLoop').setAttribute('aria-pressed', S.packLoop ? 'true' : 'false');
+  announce(S.packLoop ? 'The pack spins — the last card joins the first'
+                      : 'The pack has ends again');
+  renderDraft();
+};
 
 $('btnPackView').onclick = function(){
   S.packView = S.packView === 'rail' ? 'grid' : 'rail';
