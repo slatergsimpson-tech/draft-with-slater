@@ -174,6 +174,72 @@
   .draftgrid.panel-open{grid-template-columns:1fr minmax(340px, 32vw)}
   @media(max-width:1050px){.draftgrid,.draftgrid.panel-open{grid-template-columns:1fr}}
   .packgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--card-w),1fr)); gap:12px}
+
+  /* --- the table layout ------------------------------------------------
+   * The pack in two rows across the top, the deck in piles underneath. It
+   * is where every client people actually draft on has ended up — Arena,
+   * Draftmancer — and the reason is the same in all of them: your curve is
+   * the thing you consult to make the next pick, and in a 340px sidebar
+   * you can see three columns of it.
+   *
+   * Desktop only. A phone has the rail, which is the better answer to the
+   * same question on a 390px screen, and below 1050px the sidebar is
+   * already stacked underneath anyway. */
+  @media(min-width:1051px){
+    .draftgrid.tabletop, .draftgrid.tabletop.panel-open{grid-template-columns:minmax(0,1fr)}
+    /* The right-hand pane stops being a pane: no sticky, no scroller of its
+       own, just the next thing down the page. */
+    .draftgrid.tabletop > .sidebar{
+      position:static; max-height:none; overflow:visible;
+      background:none; border:0; padding:0; display:flex; flex-direction:column; gap:0;
+    }
+    /* One line rather than a stacked block. Between the pack and the deck
+       every pixel is one the piles do not get, and the colour bar says the
+       same thing lying down. */
+    .draftgrid.tabletop #colourBlock{
+      background:var(--panel); border:1px solid var(--line); border-radius:10px;
+      padding:9px 14px; margin-bottom:12px;
+      display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+    }
+    .draftgrid.tabletop #colourBlock h3{margin:0; flex:0 0 auto; font-size:12.5px}
+    .draftgrid.tabletop #colourBlock .colorbar{flex:1 1 220px; margin:0}
+    .draftgrid.tabletop #colourBlock .pctrow{flex:0 0 auto; margin:0}
+    /* Two rows, whatever the pack holds, with the short row centred under
+       the long one. Flex rather than grid: grid cannot centre a last row,
+       and a fifteen-card pack always has one.
+     *
+     * A card's size is three limits, whichever bites first: half the pack
+     * has to fit across, it must not outgrow the card size you chose, and
+     * two rows plus the top of the deck have to fit on the screen at once.
+     * That last one is what makes this layout worth having — without it a
+     * 900px-tall laptop put the deck below the fold, which is the thing it
+     * exists to prevent. 0.7176 is a card's width over its height.
+     *
+     * Then the ROW is pinned to exactly that many cards, rather than left
+     * to wrap wherever it likes. Capping the card alone was not enough: the
+     * height limit makes cards narrow, narrow cards leave room, and a
+     * ten-card pack came out as eight and two. --pack-avail is measured in
+     * JS because the width here cannot be read off this element without the
+     * element's own width depending on it. */
+    .draftgrid.tabletop .packgrid.tworow{
+      --cw:max(96px, min(var(--card-w),
+              calc((var(--pack-avail, 1200px) - (var(--packcols, 8) - 1) * 10px) / var(--packcols, 8)),
+              calc((100vh - var(--pack-chrome, 430px)) / 2 * 0.7176)));
+      display:flex; flex-wrap:wrap; justify-content:center; gap:10px;
+      margin:0 auto 12px;
+      width:calc(var(--packcols, 8) * var(--cw) + (var(--packcols, 8) - 1) * 10px);
+      max-width:100%;
+    }
+    .draftgrid.tabletop .packgrid.tworow .mtgcard{flex:0 0 auto; width:var(--cw)}
+    /* Full width is the entire point: nine columns of curve rather than the
+       three that fit beside the pack. */
+    .draftgrid.tabletop .piles{padding-bottom:10px}
+  }
+  /* The layout switch is meaningless where there is only one layout. */
+  @media(max-width:1050px){.deskonly{display:none}}
+  /* An arrow that means "this is which way the sort runs", not "press me to
+     go up" — the title and the announcement carry the sense. */
+  .sortdir{font-size:13px; line-height:1; padding:5px 9px; min-width:30px}
   .mtgcard{position:relative; border-radius:9px; overflow:hidden; cursor:pointer; background:var(--bg); border:2px solid transparent; transition:transform .12s, border-color .12s; aspect-ratio:488/680}
   .mtgcard img{width:100%; height:100%; display:block; object-fit:cover; position:relative; z-index:1}
 
@@ -549,8 +615,19 @@
   /* pile view — cards overlap, showing each one's title strip */
   .piles{display:flex; gap:10px; overflow-x:auto; padding-bottom:8px; align-items:flex-start}
   .pile{min-width:var(--card-w-sm); width:var(--card-w-sm); flex:0 0 auto}
-  .pile .pilehead{font-size:.8em; color:var(--ink2); text-align:center; padding:4px 0 7px; border-bottom:1px solid var(--line); margin-bottom:8px; white-space:nowrap}
+  /* The head is the handle. Dragging the cards moves a card between columns,
+     which is a different gesture with a different meaning, so the column
+     itself is picked up by the one part of it that is not a card. */
+  .pile .pilehead{font-size:.8em; color:var(--ink2); text-align:center; padding:4px 0 7px;
+    border-bottom:1px solid var(--line); margin-bottom:8px; white-space:nowrap;
+    cursor:grab; touch-action:pan-y; -webkit-user-select:none; user-select:none;
+    border-radius:6px 6px 0 0; transition:background .12s, color .12s}
+  .pile .pilehead:hover{background:var(--panel2); color:var(--ink)}
   .pile .pilehead b{color:var(--gold2)}
+  .pile{transition:transform .16s ease}
+  .pile.grabbed{position:relative; z-index:6; transition:none}
+  .pile.grabbed .pilehead{cursor:grabbing; background:var(--panel2); color:var(--gold2)}
+  .piles.reordering .pile:not(.grabbed){opacity:.75}
   .pile .stack{position:relative}
   .pile .stack .mtgcard{margin-top:calc(var(--card-w-sm) * -0.94)}
   .pile .stack .mtgcard:first-child{margin-top:0}
@@ -778,6 +855,10 @@
   .shotbox{max-width:780px}
   .shotcanvas{width:100%; height:auto; display:block; border-radius:10px;
               border:1px solid var(--line); margin-top:6px}
+  /* A deck picture is portrait and the story picture is not. Left at 100%
+     width a forty-card deck filled the dialog twice over and the buttons
+     underneath it were a scroll away. */
+  .shotcanvas.tall{width:auto; max-width:100%; max-height:58vh; margin:6px auto 0}
   /* The era preset above the reels. Chips rather than another dropdown: the
      whole point is that it is one tap from wanting the nineties to drafting
      them. */
@@ -1475,6 +1556,7 @@
       <span id="stClock" class="pill hidden" aria-live="off">⏱ <b id="stClockN">45</b></span>
       <span id="stTable" class="pill hidden" title="Who is still to pick"></span>
       <span class="spacer"></span>
+      <button class="btn sm deskonly" id="btnLayout" aria-pressed="true">Layout: table</button>
       <button class="btn sm" id="btnToggleDeck" aria-expanded="true" aria-controls="zonePanel">Hide my deck</button>
       <span id="packNote" class="pill" style="color:var(--ink3)"></span>
     </div>
@@ -1522,6 +1604,7 @@
       <button class="btn sm" id="btnPlaytest">Playtest</button>
       <button class="btn sm hidden" id="btnStory">Draft story</button>
       <button class="btn sm hidden" id="btnShareImg">Share image</button>
+      <button class="btn sm" id="btnDeckImg">Deck image</button>
     </div>
 
     <div id="cmdrZone" class="zone hidden">
@@ -1694,13 +1777,21 @@
         <div class="spacer"></div>
         <button class="btn sm" id="btnShotClose">Close</button>
       </div>
+      <!-- Three pictures of the same deck, for three different reasons.
+           The story says what happened without naming a card; the other two
+           are the deck itself. -->
+      <div class="tabs" id="shotTabs" role="tablist" aria-label="What to draw">
+        <button class="tab on" data-shot="story" role="tab" aria-selected="true">The story</button>
+        <button class="tab" data-shot="deck" role="tab" aria-selected="false">The deck</button>
+        <button class="tab" data-shot="cards" role="tab" aria-selected="false">Just the cards</button>
+      </div>
       <canvas id="shotCanvas" class="shotcanvas"></canvas>
-      <div class="shotname">
+      <div class="shotname" id="shotname">
         <label class="sr-only" for="shotNameInput">Deck name</label>
         <input id="shotNameInput" type="text" maxlength="40" autocomplete="off"
                placeholder="Name this deck">
       </div>
-      <div class="shottags">
+      <div class="shottags" id="shottags">
         <div class="tagchips" id="shotChips"></div>
         <div class="tagadd">
           <label class="sr-only" for="shotTagInput">Add a tag</label>
@@ -1769,6 +1860,12 @@
         <span id="poolFilterNote" class="pill hidden"></span>
         <label for="poolSort" class="sr-only">Sort cards by</label>
         <select id="poolSort" class="btn sm" style="padding:5px 8px"></select>
+        <!-- Which end the sort starts from. Mana value is the one that
+             matters: a curve read downwards is a different deck. -->
+        <button class="btn sm sortdir" id="poolSortDir" aria-pressed="false">&uarr;</button>
+        <!-- Only there once there is something to undo. -->
+        <button class="btn sm hidden" id="btnPileReset"
+                title="Put the columns back in their usual order">Reset columns</button>
         <div class="tabs" id="deckViewTabs" style="margin:0">
           <button class="tab on" data-view="piles">Piles</button>
           <button class="tab" data-view="colour">Colour</button>
@@ -3382,18 +3479,24 @@
     name: { label: 'Name', key: null }
   };
 
-  function sortPool(cards, mode) {
+  /* `dir` of 'desc' flips the whole comparison, tie-breaks included, because
+   * that is what "reverse this" means to the person reading the list: the
+   * card that was last is now first. Flipping only the primary key would
+   * leave equal cards in their old order and the list would read as though
+   * it had half sorted itself. */
+  function sortPool(cards, mode, dir) {
     var spec = POOL_SORTS[mode] || POOL_SORTS.rating;
+    var sign = dir === 'desc' ? -1 : 1;
     var out = cards.slice();
     out.sort(function (a, b) {
       if (spec.key) {
         var ka = spec.key(a), kb = spec.key(b);
-        if (ka !== kb) return ka - kb;
+        if (ka !== kb) return sign * (ka - kb);
       }
       // Rating, then name: deterministic regardless of input order.
       var ra = rateCard(b) - rateCard(a);
-      if (mode !== 'name' && ra !== 0) return ra;
-      return String(a.name).localeCompare(String(b.name));
+      if (mode !== 'name' && ra !== 0) return sign * ra;
+      return sign * String(a.name).localeCompare(String(b.name));
     });
     return out;
   }
@@ -5404,7 +5507,7 @@ var S = {
   pool: [], deck: [], sealed: false, picksPerTurn: 1,
   source: 'chaos', cube: [], cubeMode: 'find', searchResults: [],
   deckView: 'piles', commander: null, deckTarget: 40, spellTarget: 23,
-  poolSort: 'cmc', zone: 'deck', showDetails: false, search: '', play: null, landArt: null, landArtSet: 'deck',
+  poolSort: 'cmc', poolSortDir: 'asc', shotMode: 'story', draftLayout: 'table', pileOrder: {}, zone: 'deck', showDetails: false, search: '', play: null, landArt: null, landArtSet: 'deck',
   chaosPinned: [false, false, false],
   chaosRounds: null, chaosPerSeat: false, chaosSkipped: '', chaosPlan: null,
   chaosPrefetchError: '', waitTimer: null, lastSeed: 0, artHintCode: null,
@@ -7029,6 +7132,9 @@ function wireGuestSide(conn){
     MP.seat = N.seatOf(MP.table, MP.me);
     MP.log = [];
     S.story = null; S.shotTags = null; S.deckName = null;
+    /* A column order and a cache of card pictures both belong to the deck
+     * that is going away with them. */
+    S.pileOrder = {}; SHOT_IMGS = {};
     MP.winstonGuest = msg.mode === 'winston';
     MP.wremote = null;
     S.wNote = '';
@@ -8833,6 +8939,9 @@ function startPlay(seedOverride){
   // A fresh draft gets a fresh story; sealed never writes one. The guest
   // diary is cleared too, so a table you left cannot narrate a solo draft.
   S.story = null; S.shotTags = null; S.deckName = null;
+  /* A column order and a cache of card pictures both belong to the deck
+   * that is going away with them. */
+  S.pileOrder = {}; SHOT_IMGS = {};
   S.pileScroll = 0;
   /* A new draft is a new set of worlds, so the basics have to be worked out
    * again. Without this the lands kept whatever art the last draft chose —
@@ -9236,8 +9345,64 @@ function flyToPool(el){
   setTimeout(function(){ if (ghost.parentNode) ghost.remove(); }, 480);
 }
 
+/* How much of the screen the pack is allowed to have.
+ *
+ * The CSS caps a card's height at half of whatever is left over, and this is
+ * what tells it how much "left over" there is. It could have been a constant
+ * — it was, for an afternoon — but the header wraps to a second row on a
+ * narrower window and the constant was then wrong by exactly one header.
+ * Measuring costs one read per pack and is right on every screen.
+ *
+ * PACK_PEEK is what has to survive underneath: the colour strip, the deck
+ * panel's own head, and enough of the first pile to read a card's title. Any
+ * less and the deck is below the fold, which is the thing this layout was
+ * built to stop. */
+var PACK_PEEK = 250;
+function measurePackChrome(grid){
+  if (S.draftLayout !== 'table') return;
+  /* After layout: a grid that was just filled by innerHTML has not been
+   * placed yet, and reads as sitting at the top of the document. */
+  requestAnimationFrame(function(){
+    if (!grid.isConnected) return;
+    /* Distance from the top of the document, which is what the cards have
+     * above them — and which does not move when they shrink, so this cannot
+     * chase its own tail. */
+    var top = grid.getBoundingClientRect().top + (window.scrollY || 0);
+    /* With the deck hidden there is nothing underneath to leave room for,
+     * so the pack takes it back rather than sitting above a blank half. */
+    var peek = $('draftPanelSlot').classList.contains('hidden') ? 56 : PACK_PEEK;
+    grid.style.setProperty('--pack-chrome', Math.round(top + peek) + 'px');
+    /* The room the row has. Read off the column rather than the row itself,
+     * because the row is about to be given a width of its own and would
+     * otherwise be measuring its own answer. */
+    var box = grid.parentNode;
+    if (box && box.clientWidth) {
+      grid.style.setProperty('--pack-avail', Math.floor(box.clientWidth) + 'px');
+    }
+  });
+}
+
+/* A window that changes size changes both answers. Debounced, because a drag
+ * of the window edge fires this continuously. */
+var packMeasureTimer = null;
+window.addEventListener('resize', function(){
+  clearTimeout(packMeasureTimer);
+  packMeasureTimer = setTimeout(function(){
+    var grid = $('packGrid');
+    if (grid && !$('viewDraft').classList.contains('hidden')) measurePackChrome(grid);
+  }, 120);
+});
+
 function applyPackView(grid, cards){
   var n = (cards || []).length;
+  /* Two rows, so half the pack per row — the longer row first, which is
+   * what both Arena and Draftmancer do and what makes a 15-card pack read
+   * as 8 and 7 rather than as a wall. The CSS does the rest. */
+  grid.style.setProperty('--packcols', String(Math.max(1, Math.ceil(n / 2))));
+  /* Only a real pack is laid out in two rows. Winston borrows this same
+   * element for three piles and a stack, and never comes through here. */
+  grid.classList.add('tworow');
+  measurePackChrome(grid);
   grid.classList.toggle('packrail', S.packView === 'rail');
   $('btnPackView').textContent = S.packView === 'rail' ? 'Whole pack' : 'One at a time';
   $('btnPackView').setAttribute('aria-pressed', S.packView === 'rail' ? 'false' : 'true');
@@ -9497,6 +9662,7 @@ function winstonOppName(){
 function renderWinston(){
   var v = winstonView();
   var grid = $('packGrid');
+  grid.classList.remove('tworow');   // not a pack; see applyPackView
   if (!v){
     grid.innerHTML = '<div class="nomatch">Waiting for the table…</div>';
     return;
@@ -9897,11 +10063,52 @@ $('btnSearchClear').onclick = function(){
   announce('Search cleared');
 };
 
+/* What the two directions are actually called, per sort. "Ascending" is
+ * accurate and tells you nothing; "low to high" is what a drafter says out
+ * loud when they mean it. Anything without an obvious pair of words falls
+ * back to the generic, which is better than a wrong specific. */
+var SORT_DIR_WORDS = {
+  cmc:    ['low to high', 'high to low'],
+  rating: ['best first', 'worst first'],
+  rarity: ['mythic first', 'common first'],
+  name:   ['A to Z', 'Z to A'],
+  color:  ['white first', 'colourless first'],
+  type:   ['creatures first', 'creatures last']
+};
+function sortDirWord(dir){
+  var pair = SORT_DIR_WORDS[S.poolSort] || ['first to last', 'last to first'];
+  return pair[dir === 'desc' ? 1 : 0];
+}
+function applySortDir(){
+  var down = S.poolSortDir === 'desc';
+  var b = $('poolSortDir');
+  b.textContent = down ? '\u2193' : '\u2191';
+  b.setAttribute('aria-pressed', down ? 'true' : 'false');
+  var now = E.POOL_SORTS[S.poolSort].label + ', ' + sortDirWord(S.poolSortDir);
+  var next = sortDirWord(down ? 'asc' : 'desc');
+  b.title = now + ' \u2014 click for ' + next;
+  b.setAttribute('aria-label', 'Sorted ' + now + '. Reverse to ' + next + '.');
+}
+$('btnPileReset').onclick = function(){
+  delete S.pileOrder[S.deckView];
+  refresh();
+  announce('Columns back in their usual order');
+};
+
+$('poolSortDir').onclick = function(){
+  S.poolSortDir = S.poolSortDir === 'desc' ? 'asc' : 'desc';
+  applySortDir();
+  refresh();
+  announce(E.POOL_SORTS[S.poolSort].label + ', ' + sortDirWord(S.poolSortDir));
+};
+
 $('poolSort').onchange = function(){
   S.poolSort = $('poolSort').value;
+  applySortDir();          // the words for the arrow change with the sort
   refresh();
-  announce('Sorted by ' + E.POOL_SORTS[S.poolSort].label);
+  announce('Sorted by ' + E.POOL_SORTS[S.poolSort].label + ', ' + sortDirWord(S.poolSortDir));
 };
+applySortDir();
 
 // Move the shared panel into whichever screen is showing it.
 function mountPanel(slotId){
@@ -9919,6 +10126,47 @@ function refresh(){
   else if (!$('viewDraft').classList.contains('hidden')) renderDraft();
   else if (!$('viewPlay').classList.contains('hidden') && S.play) renderPlay();
 }
+
+/* ---------------- draft layout ----------------
+ *
+ * 'table' is the one described above the CSS: pack on top, deck underneath.
+ * 'sidebar' is what the app used to do, kept because it is better on a short
+ * screen — a laptop with 700px of height fits two rows of cards and nothing
+ * else — and because a layout you cannot leave is a layout you resent.
+ *
+ * Remembered, like the card size and the motion switch. Which way you draft
+ * is not a per-session question. */
+var LAYOUT_KEY = 'draft:layout';
+
+function applyDraftLayout(){
+  var table = S.draftLayout === 'table';
+  $('draftGrid').classList.toggle('tabletop', table);
+  var b = $('btnLayout');
+  b.textContent = 'Layout: ' + (table ? 'table' : 'sidebar');
+  b.setAttribute('aria-pressed', table ? 'true' : 'false');
+  b.title = table
+    ? 'The pack in two rows with your deck underneath \u2014 click for the deck beside the pack'
+    : 'Your deck beside the pack \u2014 click for the pack in two rows with the deck underneath';
+  try { localStorage.setItem(LAYOUT_KEY, S.draftLayout); } catch (e) {}
+}
+
+$('btnLayout').onclick = function(){
+  S.draftLayout = S.draftLayout === 'table' ? 'sidebar' : 'table';
+  applyDraftLayout();
+  /* The pack is laid out from measurements, so it has to be drawn again
+   * rather than merely restyled. */
+  renderDraft();
+  announce(S.draftLayout === 'table'
+    ? 'Pack in two rows, deck underneath'
+    : 'Deck beside the pack');
+};
+
+(function(){
+  var saved = null;
+  try { saved = localStorage.getItem(LAYOUT_KEY); } catch (e) {}
+  if (saved === 'sidebar' || saved === 'table') S.draftLayout = saved;
+  applyDraftLayout();
+}());
 
 $('btnToggleDeck').onclick = function(){
   var slot = $('draftPanelSlot');
@@ -9974,6 +10222,43 @@ var PILE_ORDER = {
   type: ['Creature','Instant','Sorcery','Artifact','Enchantment','Planeswalker','Land','Other']
 };
 
+/* Which order the columns run in.
+ *
+ * Two things can move them. The sort direction flips the curve, because a
+ * mana curve read high-to-low is a thing people genuinely want to see and
+ * the arrow next to the sort is where they will look for it. Dragging a
+ * column by its head sets an order by hand, and that wins outright — once
+ * you have said where a column goes, nothing else should move it.
+ *
+ * The trailing columns stay trailing either way. Lands are not part of the
+ * curve and an "Other" pile is not a card type anyone sorted towards; both
+ * are where you look last, whichever way the numbers run. */
+var PILE_TAIL = { Land: 1, Lands: 1, Other: 1 };
+/* What a column is called out loud. The mana-value view is the only one
+ * whose keys are not already words. */
+function pileLabel(k, view){
+  if (view !== 'piles') return k;
+  return k === 'Land' ? 'Lands' : 'MV ' + k;
+}
+function orderPileKeys(keys, view){
+  var custom = S.pileOrder[view];
+  if (custom && custom.length) {
+    /* A key the custom order has never seen — a colour you have only just
+     * drafted — goes to the end rather than vanishing. */
+    return keys.slice().sort(function(a, b){
+      var ia = custom.indexOf(a), ib = custom.indexOf(b);
+      if (ia === -1 && ib === -1) return keys.indexOf(a) - keys.indexOf(b);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+  }
+  if (S.poolSortDir !== 'desc') return keys;
+  var body = keys.filter(function(k){ return !PILE_TAIL[k]; });
+  var tail = keys.filter(function(k){ return PILE_TAIL[k]; });
+  return body.reverse().concat(tail);
+}
+
 /* Renders whichever zone tab is active into the shared panel. Both zones use
  * the same grouping and sorting controls; only the destination differs. */
 function currentSideboard(){
@@ -10016,7 +10301,7 @@ function renderZonePanel(){
     cards = cards.filter(function(c){ return E.withinIdentity(c, identity); });
     hidden = before - cards.length;
   }
-  cards = E.sortPool(cards, S.poolSort);
+  cards = E.sortPool(cards, S.poolSort, S.poolSortDir);
 
   // Search narrows what's displayed; it never changes what's in a zone.
   var totalBeforeSearch = cards.length;
@@ -10024,6 +10309,12 @@ function renderZonePanel(){
   $('searchHint').textContent = S.search
     ? 'Showing ' + cards.length + ' of ' + totalBeforeSearch + ' — search filters the view only.'
     : '';
+
+  /* The reset only exists while a hand-made order does, and only for the
+   * view that has one — the orders are kept per view, so leaving Piles for
+   * Colour should not offer to undo something you did somewhere else. */
+  var custom = S.pileOrder[S.deckView];
+  $('btnPileReset').classList.toggle('hidden', !(custom && custom.length));
 
   $('tabDeckN').textContent = S.deck.length + (S.commander ? 1 : 0);
   $('tabSideN').textContent = sideboard.length;
@@ -10075,14 +10366,19 @@ function renderZonePanel(){
     ? order.slice()
     : order.filter(function(k){ return groups[k] && groups[k].length; });
   keys = keys.concat(Object.keys(groups).filter(function(k){ return keys.indexOf(k) === -1; }));
+  keys = orderPileKeys(keys, view);
 
   var flat = [];
   area.innerHTML = '<div class="piles">' + keys.map(function(k){
     var inPile = groups[k] || [];   // already in the chosen sort order
-    var label = view === 'piles' ? (k === 'Land' ? 'Lands' : 'MV ' + k) : k;
+    var label = pileLabel(k, view);
     return '<div class="pile' + (view === 'piles' ? ' droppile' : '') +
       '" data-pile="' + esc(k) + '">' +
-      '<div class="pilehead">' + esc(label) + ' <b>' + inPile.length + '</b></div>' +
+      '<div class="pilehead" tabindex="0" role="button" data-pile="' + esc(k) + '"' +
+      ' aria-label="' + esc(label + ', ' + inPile.length + ' card' + (inPile.length === 1 ? '' : 's') +
+        '. Drag it, or press the left and right arrow keys, to move this column.') + '"' +
+      ' title="Drag to move this column">' +
+      esc(label) + ' <b>' + inPile.length + '</b></div>' +
       '<div class="stack">' +
       inPile.map(function(c){ flat.push(c); return cardHTML(c, '', !isDeck, action); }).join('') +
       '</div></div>';
@@ -10092,6 +10388,7 @@ function renderZonePanel(){
     el.onclick = function(){ move(flat[i]); };
   });
   if (view === 'piles') wirePileDrag(area, flat);
+  wirePileOrder(area, view);
   registerZoom(area, flat);
   keepPlace();
 }
@@ -10153,6 +10450,146 @@ function wirePileDrag(area, flat){
       PILE_DRAG = null;
     };
   });
+}
+
+/* ---- moving a whole column ----
+ *
+ * Which column sits where is a reading decision, not a fact. Curve order is
+ * the right default and the sort arrow flips it, but a drafter laying out
+ * forty cards has their own ideas — the removal next to the creatures it
+ * answers, the splash colour out at the end where it can be looked at on its
+ * own. So a column can be picked up by its head and put somewhere else.
+ *
+ * The same gesture as the pack reels, for the same reason: pointer events,
+ * because HTML5 drag-and-drop has never worked on a touchscreen, and a
+ * sideways test so that a vertical swipe stays a scroll. */
+var PILE_ORDER_DRAG = null;
+
+function wirePileOrder(area, view){
+  Array.prototype.forEach.call(area.querySelectorAll('.pile > .pilehead'), function(head){
+    head.__view = view;
+    head.addEventListener('pointerdown', pileHeadDown);
+    head.addEventListener('keydown', pileHeadKey);
+  });
+}
+
+function pileEls(area){
+  return Array.prototype.slice.call(area.querySelectorAll('.piles > .pile'));
+}
+
+function pileHeadDown(e){
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  var head = e.currentTarget;
+  var pile = head.parentNode;
+  var strip = pile.parentNode;
+  var els = Array.prototype.slice.call(strip.children);
+  var i = els.indexOf(pile);
+  if (i === -1) return;
+  var rects = els.map(function(x){ return x.getBoundingClientRect(); });
+  PILE_ORDER_DRAG = {
+    i: i, to: i, el: pile, strip: strip, els: els, view: head.__view,
+    id: e.pointerId, x: e.clientX, y: e.clientY, live: false,
+    lefts: rects.map(function(r){ return r.left; }),
+    centers: rects.map(function(r){ return r.left + r.width / 2; })
+  };
+  // On the window: the pointer leaves a 104px-wide column immediately.
+  window.addEventListener('pointermove', pileHeadMove);
+  window.addEventListener('pointerup', pileHeadUp);
+  window.addEventListener('pointercancel', pileHeadCancel);
+}
+
+function pileTargetFor(d, clientX){
+  var mid = d.centers[d.i] + (clientX - d.x);
+  var best = 0, dist = Infinity;
+  d.centers.forEach(function(c, k){
+    var gap = Math.abs(c - mid);
+    if (gap < dist) { dist = gap; best = k; }
+  });
+  return best;
+}
+
+function pileOrderPreview(d){
+  var order = d.els.map(function(_, k){ return k; }).filter(function(k){ return k !== d.i; });
+  order.splice(d.to, 0, d.i);
+  d.els.forEach(function(el, k){
+    if (k === d.i) return;
+    var pos = order.indexOf(k);
+    el.style.transform = 'translateX(' + (d.lefts[pos] - d.lefts[k]) + 'px)';
+  });
+}
+
+function pileHeadMove(e){
+  var d = PILE_ORDER_DRAG;
+  if (!d || e.pointerId !== d.id) return;
+  var dx = e.clientX - d.x, dy = e.clientY - d.y;
+  if (!d.live) {
+    if (Math.abs(dx) < 8 || Math.abs(dx) <= Math.abs(dy)) return;
+    d.live = true;
+    d.el.classList.add('grabbed');
+    d.strip.classList.add('reordering');
+    hideZoom();
+    try { d.el.setPointerCapture(d.id); } catch (err) {}
+  }
+  e.preventDefault();
+  d.el.style.transform = 'translateX(' + dx + 'px)';
+  var to = pileTargetFor(d, e.clientX);
+  if (to !== d.to) { d.to = to; pileOrderPreview(d); }
+}
+
+function pileOrderRelease(d){
+  window.removeEventListener('pointermove', pileHeadMove);
+  window.removeEventListener('pointerup', pileHeadUp);
+  window.removeEventListener('pointercancel', pileHeadCancel);
+  try { d.el.releasePointerCapture(d.id); } catch (err) {}
+  d.strip.classList.remove('reordering');
+  d.els.forEach(function(el){ el.classList.remove('grabbed'); el.style.transform = ''; });
+  PILE_ORDER_DRAG = null;
+}
+
+function pileHeadUp(e){
+  var d = PILE_ORDER_DRAG;
+  if (!d || e.pointerId !== d.id) return;
+  var live = d.live, from = d.i, to = d.to, view = d.view;
+  var keys = d.els.map(function(el){ return el.dataset.pile; });
+  pileOrderRelease(d);
+  if (!live) return;                 // a click on a column head does nothing
+  e.preventDefault();
+  if (from !== to) movePileColumn(keys, from, to, view);
+  else renderZonePanel();            // clear the transforms the preview left
+}
+
+function pileHeadCancel(e){
+  var d = PILE_ORDER_DRAG;
+  if (!d || e.pointerId !== d.id) return;
+  pileOrderRelease(d);
+  renderZonePanel();
+}
+
+function pileHeadKey(e){
+  var head = e.currentTarget;
+  var pile = head.parentNode;
+  var els = Array.prototype.slice.call(pile.parentNode.children);
+  var i = els.indexOf(pile), to = null;
+  if (e.key === 'ArrowLeft' && i > 0) to = i - 1;
+  else if (e.key === 'ArrowRight' && i < els.length - 1) to = i + 1;
+  else return;
+  e.preventDefault();
+  var keys = els.map(function(el){ return el.dataset.pile; });
+  movePileColumn(keys, i, to, head.__view);
+  /* The panel is rebuilt, so the element that had focus is gone. Follow the
+   * column rather than the position: it is the column you are moving. */
+  var moved = $('zoneArea').querySelectorAll('.piles > .pile')[to];
+  if (moved) moved.querySelector('.pilehead').focus();
+}
+
+/* Record the order by hand. From here on this view ignores the sort
+ * direction's opinion about column order — you have given it one. */
+function movePileColumn(keys, from, to, view){
+  var order = keys.slice();
+  order.splice(to, 0, order.splice(from, 1)[0]);
+  S.pileOrder[view] = order;
+  announce(pileLabel(keys[from], view) + ' moved to position ' + (to + 1) + ' of ' + keys.length);
+  renderZonePanel();
 }
 
 /* Move a card into a column, or clear the override if that column is the one
@@ -11343,7 +11780,9 @@ function shotFilename(){
   var d = new Date();
   var pad = function(n){ return (n < 10 ? '0' : '') + n; };
   var stamp = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
-  return ['draft', slug, stamp].filter(Boolean).join('-') + '.png';
+  // Named for what it is a picture of, so a folder of them can be told apart.
+  var kind = S.shotMode === 'story' ? 'draft' : 'deck';
+  return [kind, slug, stamp].filter(Boolean).join('-') + '.png';
 }
 
 function shotBlob(){
@@ -11475,20 +11914,375 @@ function addShotTag(text){
   redrawShot();
 }
 
+/* ---------------- the deck, as a picture ----------------
+ *
+ * The share image above this is deliberately card-free: it is the story of a
+ * draft, and it must not hand the next drafter the table. This is the other
+ * thing people want from a finished deck, which is to show somebody the
+ * forty cards — the Archidekt deck image, the photo of a deck laid out on a
+ * mat before a round. Different job, different picture, same dialog.
+ *
+ * Two styles, because they get used for different things. 'full' carries the
+ * name, the curve and the colours above the deck, which is what you post
+ * when you want to talk about the deck. 'cards' is the forty cards and
+ * nothing else, which is what you post when the cards are the point.
+ *
+ * Everything below reads the same grouping, ordering and sort direction as
+ * the deck panel on screen — so the picture is the arrangement you made,
+ * including any columns you dragged, rather than a second opinion about it.
+ */
+
+var SHOT_CARD_RATIO = 680 / 488;          // a card's height over its width
+
+/* Images, kept between redraws. Drawing is re-run for every name keystroke
+ * and every style flip, and re-fetching forty cards each time would make the
+ * dialog feel broken on a phone. Keyed by URL, so two Forests with the same
+ * art load once. */
+var SHOT_IMGS = {};
+
+/* crossOrigin matters and is the whole reason this works: without it the
+ * canvas is tainted the moment a card is drawn on it, and toBlob throws —
+ * no copy, no download, no explanation. Scryfall's image CDN sends the
+ * header that makes this legal; it was checked before any of this was
+ * written. */
+function loadShotImage(url){
+  if (SHOT_IMGS[url] !== undefined) return Promise.resolve(SHOT_IMGS[url]);
+  return new Promise(function(resolve){
+    var img = new Image();
+    var settle = function(val){
+      if (SHOT_IMGS[url] === undefined) SHOT_IMGS[url] = val;
+      resolve(SHOT_IMGS[url]);
+    };
+    /* A card that never answers must not hold the whole picture hostage —
+     * it draws as a named panel instead, which is worth more than a dialog
+     * that sits there. */
+    var timer = setTimeout(function(){ settle(null); }, 8000);
+    img.crossOrigin = 'anonymous';
+    img.onload = function(){ clearTimeout(timer); settle(img); };
+    img.onerror = function(){ clearTimeout(timer); settle(null); };
+    img.src = url;
+  });
+}
+
+function loadShotImages(cards){
+  var urls = [];
+  cards.forEach(function(c){
+    var u = E.imageOf(c);
+    if (u && urls.indexOf(u) === -1) urls.push(u);
+  });
+  return mapLimit(urls, 8, function(u){ return loadShotImage(u); });
+}
+
+/* The columns, exactly as the deck panel has them. */
+function deckShotColumns(cards){
+  var view = S.deckView === 'grid' ? 'piles' : S.deckView;
+  var sorted = E.sortPool(cards, S.poolSort, S.poolSortDir);
+  var groups = {};
+  sorted.forEach(function(c){
+    var k = pileKeyFor(c, view);
+    (groups[k] = groups[k] || []).push(c);
+  });
+  var order = PILE_ORDER[view] || [];
+  /* Empty columns are drawn on screen so there is somewhere to drop a card.
+   * In a picture an empty column is just a hole, so they go. */
+  var keys = order.filter(function(k){ return groups[k] && groups[k].length; });
+  keys = keys.concat(Object.keys(groups).filter(function(k){ return keys.indexOf(k) === -1; }));
+  return { view: view, keys: orderPileKeys(keys, view), groups: groups };
+}
+
+/* Seventeen Plains in one column next to four two-drops is a true picture of
+ * the deck and a bad picture of anything. Archidekt splits a long column in
+ * two and so does anybody laying a deck out on a table, because what you are
+ * looking at is a shape.
+ *
+ * Split into equal parts rather than full-then-remainder: 17 becomes 9 and 8,
+ * not 8 and 8 and 1. The cap lifts if splitting would leave more columns than
+ * fit across the picture — past that point narrower cards cost more than the
+ * ragged edge does. */
+function deckShotLayout(cards, maxCols){
+  var cols = deckShotColumns(cards);
+  for (var limit = 8; limit <= 24; limit += 2) {
+    var out = [];
+    cols.keys.forEach(function(k){
+      var list = cols.groups[k];
+      var parts = Math.max(1, Math.ceil(list.length / limit));
+      var size = Math.ceil(list.length / parts);
+      for (var p = 0; p < parts; p++) {
+        out.push({
+          key: k,
+          /* Only the first slice is named: the second column of Plains is
+           * obviously more Plains, and a repeated heading reads as a
+           * different column. */
+          label: p === 0 ? pileLabel(k, cols.view) + '  ' + list.length : '',
+          cards: list.slice(p * size, (p + 1) * size)
+        });
+      }
+    });
+    if (out.length <= maxCols || limit >= 24) return { view: cols.view, cols: out };
+  }
+  return { view: cols.view, cols: [] };
+}
+
+/* One card. Clipped to rounded corners, with a hairline so that overlapping
+ * cards in a column still read as separate cards rather than as one long
+ * smear of art. */
+function drawShotCard(ctx, card, x, y, w, h){
+  var url = E.imageOf(card);
+  var img = url ? SHOT_IMGS[url] : null;
+  var r = Math.max(4, w * 0.047);
+  ctx.save();
+  shotPath(ctx, x, y, w, h, r);
+  ctx.clip();
+  if (img) {
+    ctx.drawImage(img, x, y, w, h);
+  } else {
+    // No picture: say what the card is, which is what the picture was for.
+    ctx.fillStyle = SHOT.panel;
+    ctx.fillRect(x, y, w, h);
+    ctx.textAlign = 'center';
+    var size = shotFit(ctx, card.name, w - 14, '600', 14, SHOT_SANS, 9);
+    ctx.font = '600 ' + size + 'px ' + SHOT_SANS;
+    ctx.fillStyle = SHOT.ink;
+    ctx.fillText(card.name, x + w / 2, y + h * 0.42);
+    ctx.font = '500 ' + Math.max(8, size - 3) + 'px ' + SHOT_SANS;
+    ctx.fillStyle = SHOT.ink3;
+    ctx.fillText(card.mana_cost || '', x + w / 2, y + h * 0.42 + size + 4);
+  }
+  ctx.restore();
+  shotPath(ctx, x + 0.5, y + 0.5, w - 1, h - 1, r);
+  ctx.strokeStyle = 'rgba(0,0,0,.65)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+/* A deck in one line: what is actually in it. Lands counted as lands even
+ * when they were drafted rather than added, because seventeen is seventeen
+ * however it got there. */
+function deckShotCounts(cards){
+  var creatures = 0, lands = 0, spells = 0;
+  cards.forEach(function(c){
+    if (E.isLandCard(c)) lands++;
+    else if (/\bCreature\b/.test(c.type_line || '')) creatures++;
+    else spells++;
+  });
+  var bits = [cards.length + ' cards'];
+  if (creatures) bits.push(creatures + ' creature' + (creatures === 1 ? '' : 's'));
+  if (spells) bits.push(spells + ' spell' + (spells === 1 ? '' : 's'));
+  if (lands) bits.push(lands + ' land' + (lands === 1 ? '' : 's'));
+  return bits.join(' · ');
+}
+
+/* --- style 'full': the deck under its own heading --- */
+function drawDeckFull(canvas, cards){
+  var W = SHOT_W, PAD = 44, GAP = 10, HEAD = 316;
+  var layout = deckShotLayout(cards, 11);
+  var n = layout.cols.length;
+  if (!n) return null;
+
+  /* Wide enough to read, narrow enough that nine columns fit. The cap stops
+   * a two-colour pile view from drawing two enormous cards. */
+  var cw = Math.min(152, (W - PAD * 2 - GAP * (n - 1)) / n);
+  var ch = cw * SHOT_CARD_RATIO;
+  /* How much of each card the one below it leaves showing. A card's title
+   * and mana cost live in the top eighth; a little more than that so the
+   * name is never touching the edge of the card above. */
+  var step = Math.max(18, ch * 0.135);
+  var longest = layout.cols.reduce(function(m, c){
+    return Math.max(m, c.cards.length);
+  }, 0);
+  var bodyH = ch + (longest - 1) * step;
+  var H = HEAD + bodyH + 52;
+
+  canvas.width = W * SHOT_SCALE;
+  canvas.height = H * SHOT_SCALE;
+  var ctx = canvas.getContext('2d');
+  ctx.setTransform(SHOT_SCALE, 0, 0, SHOT_SCALE, 0, 0);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = SHOT.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // --- the heading ---------------------------------------------------
+  shotTracked(ctx, 'DRAFT WITH SLATER', PAD, 50, 12, SHOT.ink3, 3);
+
+  var deckName = String(S.deckName || '').trim();
+  var setName = (S.chosen && S.chosen.name) || 'A draft';
+  var title = deckName || setName;
+  ctx.textAlign = 'left';
+  var ts = shotFit(ctx, title, W * 0.60 - PAD * 2 - 22, '600', 36, SHOT_SERIF, 19);
+  ctx.font = '600 ' + ts + 'px ' + SHOT_SERIF;
+  ctx.fillStyle = SHOT.ink;
+  ctx.fillText(title, PAD, 96);
+
+  ctx.font = '500 15px ' + SHOT_SANS;
+  ctx.fillStyle = SHOT.ink3;
+  ctx.fillText((deckName ? setName + ' · ' : '') + deckShotCounts(cards) + ' · ' + shotDate(),
+    PAD, 122);
+
+  /* Curve and colours read the spells, not the whole deck — the same rule
+   * the story picture follows, and for the reason written out up there:
+   * basics are colourless cards, and counting them makes every deck come
+   * out looking half colourless.
+   *
+   * Both sit on panels, as they do there. Without one the percentages read
+   * as though they had been printed on the colour bar. The count goes in
+   * the heading rather than in shotColours' footnote, which at this height
+   * lands on the same line as the percentages. */
+  var spells = cards.filter(function(c){ return !E.isLandCard(c); });
+  var curveX = W * 0.60, curveW = W - PAD - curveX;
+  shotPanel(ctx, curveX, 24, curveW, 200);
+  shotCurve(ctx, spells, curveX, 24, curveW, 200, 'MANA CURVE');
+
+  var colW = curveX - PAD - 22;
+  shotPanel(ctx, PAD, 150, colW, 130);
+  shotColours(ctx, spells, PAD, 150, colW, 130,
+    'COLOURS · ' + spells.length + ' NONLAND CARDS');
+
+  // --- the deck --------------------------------------------------------
+  var rowW = n * cw + (n - 1) * GAP;
+  var startX = Math.max(PAD, (W - rowW) / 2);
+  layout.cols.forEach(function(col, i){
+    var x = startX + i * (cw + GAP);
+    if (col.label) {
+      ctx.textAlign = 'center';
+      ctx.font = '600 13px ' + SHOT_SANS;
+      ctx.fillStyle = SHOT.ink3;
+      ctx.fillText(col.label, x + cw / 2, HEAD - 12);
+    }
+    col.cards.forEach(function(c, j){
+      drawShotCard(ctx, c, x, HEAD + j * step, cw, ch);
+    });
+  });
+
+  return { cards: cards.length, columns: n };
+}
+
+/* --- style 'cards': the forty cards and nothing else --- */
+function drawDeckCards(canvas, cards){
+  var W = SHOT_W, PAD = 26, GAP = 7;
+  /* Read down the curve, then across — the same order the columns are in,
+   * flattened. A deck photo that is not in some order is just a pile. */
+  var flat = [];
+  deckShotLayout(cards, 99).cols.forEach(function(c){ flat = flat.concat(c.cards); });
+  if (!flat.length) return null;
+
+  /* Roughly square, which is what a deck laid out on a table looks like and
+   * what survives being shrunk into a chat window. */
+  var per = Math.max(5, Math.min(10, Math.round(Math.sqrt(flat.length * 1.6))));
+  var rows = Math.ceil(flat.length / per);
+  var cw = (W - PAD * 2 - GAP * (per - 1)) / per;
+  var ch = cw * SHOT_CARD_RATIO;
+  var H = PAD * 2 + rows * ch + (rows - 1) * GAP;
+
+  canvas.width = W * SHOT_SCALE;
+  canvas.height = H * SHOT_SCALE;
+  var ctx = canvas.getContext('2d');
+  ctx.setTransform(SHOT_SCALE, 0, 0, SHOT_SCALE, 0, 0);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = SHOT.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  flat.forEach(function(c, i){
+    var r = Math.floor(i / per), col = i % per;
+    /* The last row is centred, because a row of three hanging off the left
+     * of a picture of forty cards looks like the picture was cut short. */
+    var inRow = Math.min(per, flat.length - r * per);
+    var rowW = inRow * cw + (inRow - 1) * GAP;
+    var x = (W - rowW) / 2 + col * (cw + GAP);
+    drawShotCard(ctx, c, x, PAD + r * (ch + GAP), cw, ch);
+  });
+
+  return { cards: flat.length, columns: per };
+}
+
+/* Draw whichever style, once the pictures are in hand. Returns a promise so
+ * the caller can put the buttons back afterwards. */
+function drawDeckShot(canvas, style){
+  var cards = shotSubject().cards;
+  if (!cards || !cards.length) return Promise.resolve(null);
+  deckShotBusy(canvas, cards.length);
+  return loadShotImages(cards).then(function(){
+    return style === 'cards' ? drawDeckCards(canvas, cards) : drawDeckFull(canvas, cards);
+  });
+}
+
+/* Something to look at while forty images arrive. Drawn at the size the
+ * finished picture will roughly be, so the dialog does not jump. */
+function deckShotBusy(canvas, n){
+  var W = SHOT_W, H = 700;
+  canvas.width = W * SHOT_SCALE;
+  canvas.height = H * SHOT_SCALE;
+  var ctx = canvas.getContext('2d');
+  ctx.setTransform(SHOT_SCALE, 0, 0, SHOT_SCALE, 0, 0);
+  ctx.fillStyle = SHOT.bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.font = '500 18px ' + SHOT_SANS;
+  ctx.fillStyle = SHOT.ink3;
+  ctx.fillText('Fetching ' + n + ' card images…', W / 2, H / 2);
+}
+
+/* Draw whichever picture is selected.
+ *
+ * The story draws instantly from numbers already in hand; the deck has to
+ * fetch forty images the first time. Both go through here so that nothing
+ * else has to know which kind it is dealing with. */
+function drawCurrentShot(){
+  var canvas = $('shotCanvas');
+  if (S.shotMode === 'story') return drawShareShot(canvas);
+  return drawDeckShot(canvas, S.shotMode === 'cards' ? 'cards' : 'full');
+}
+
+/* What the dialog says about itself, which is different for each picture.
+ * The name and the tags belong to the two that have a heading to put them
+ * in; "just the cards" has nowhere to show either, so it says so by not
+ * offering them. */
+function applyShotMode(){
+  var mode = S.shotMode;
+  /* Sealed writes no pick diary, so it has no story to draw. Offering the
+   * tab anyway left the previous picture on the canvas with a tab lit above
+   * it that could not change it. */
+  $('shotTabs').children[0].classList.toggle('hidden', !(S.story || buildStory()));
+  Array.prototype.forEach.call($('shotTabs').children, function(b){
+    var on = b.dataset.shot === mode;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  var story = mode === 'story';
+  $('shotCanvas').classList.toggle('tall', !story);
+  $('shotTitle').textContent = story ? 'Your draft, as a picture' : 'Your deck, as a picture';
+  $('shottags').classList.toggle('hidden', !story);
+  $('shotname').classList.toggle('hidden', mode === 'cards');
+  var subject = shotSubject();
+  $('shotNote').textContent = story
+    ? (subject.built
+        ? 'No card names and no seed, so it says what you built without giving the next drafter the table.'
+        : 'Your picks so far — build the deck first for the curve and colours to mean more.')
+    : (mode === 'cards'
+        ? 'Every card in the deck and nothing else, in the order your columns are in.'
+        : 'The deck itself, laid out in the columns you arranged — this one does name every card.');
+}
+
 function redrawShot(){
-  drawShareShot($('shotCanvas'));
+  drawCurrentShot();
   renderShotTags();
 }
 
-function openShot(){
-  var story = drawShareShot($('shotCanvas'));
-  if (!story) return;
+function openShot(mode){
   var subject = shotSubject();
+  /* The story is fed by the pick diary, which sealed never writes. The deck
+   * only needs a deck, so it is offered wherever there is one. */
+  if (mode) S.shotMode = mode;
+  if (S.shotMode === 'story' && !S.story && !buildStory()) S.shotMode = 'deck';
+  if (!subject.cards.length) return;
+
+  applyShotMode();
+  var drawn = drawCurrentShot();
+  if (S.shotMode === 'story' && !drawn) return;
+
   $('shotSub').textContent = (S.chosen ? S.chosen.name + ' · ' : '') +
-    story.hist.length + ' picks';
-  $('shotNote').textContent = subject.built
-    ? 'No card names and no seed, so it says what you built without giving the next drafter the table.'
-    : 'Your picks so far — build the deck first for the curve and colours to mean more.';
+    (S.shotMode === 'story' && S.story
+      ? S.story.hist.length + ' picks'
+      : deckShotCounts(subject.cards));
   $('shotNameInput').value = S.deckName || '';
   renderShotTags();
 
@@ -11512,7 +12306,20 @@ function closeShot(){
   $('shotOver').classList.add('hidden');
 }
 
-$('btnShareImg').onclick = openShot;
+Array.prototype.forEach.call($('shotTabs').children, function(b){
+  b.onclick = function(){
+    if (S.shotMode === b.dataset.shot) return;
+    S.shotMode = b.dataset.shot;
+    applyShotMode();
+    drawCurrentShot();
+    announce(b.textContent);
+  };
+});
+
+$('btnShareImg').onclick = function(){ openShot('story'); };
+/* One click from the deckbuilder to a picture of the deck. This is the
+ * whole request: not a picture *about* the deck, the deck. */
+$('btnDeckImg').onclick = function(){ openShot('deck'); };
 $('btnShotClose').onclick = closeShot;
 $('btnShotCopy').onclick = shotCopy;
 $('btnShotShare').onclick = shotShare;
@@ -11525,14 +12332,14 @@ var shotNameTimer = null;
 $('shotNameInput').addEventListener('input', function(){
   S.deckName = $('shotNameInput').value;
   clearTimeout(shotNameTimer);
-  shotNameTimer = setTimeout(function(){ drawShareShot($('shotCanvas')); }, 180);
+  shotNameTimer = setTimeout(drawCurrentShot, 180);
 });
 // Enter means "done naming", not "submit the dialog".
 $('shotNameInput').addEventListener('keydown', function(e){
   if (e.key !== 'Enter') return;
   e.preventDefault();
   clearTimeout(shotNameTimer);
-  drawShareShot($('shotCanvas'));
+  drawCurrentShot();
   $('shotNameInput').blur();
 });
 

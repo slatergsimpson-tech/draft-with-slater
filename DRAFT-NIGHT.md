@@ -606,12 +606,25 @@ and promos are skipped where the set has an ordinary printing to use instead,
 unless — like Unfinity — the special treatment is all the set has. The line
 under the menu says exactly which sets it used and why.
 
-**How do I show someone a deck I liked?** Press **Share image** on the deck
-screen. It draws your draft as one picture — your tags, the colour journey
-with the pivot marked, the mana curve, the colour split, the set and the date.
-**Copy image** puts it on the clipboard so you can paste it straight into the
-group chat, **Download** saves the PNG, and on a phone **Share** hands it to
-the usual share sheet.
+**How do I show someone a deck I liked?** Two buttons, because there are two
+different things people mean by that.
+
+**Deck image** draws the deck itself: every card, in the columns you arranged
+them in, under a heading with the name, the curve, the colours and the counts.
+It is one click from the deck screen and it is the one to send when somebody
+wants to *see the deck*.
+
+**Share image** draws the draft instead — your tags, the colour journey with
+the pivot marked, the curve, the colour split, the set and the date, and not a
+single card name. It is the one to send when you want to talk about what you
+built without handing the next drafter the table.
+
+Both open the same box, and the tabs across the top switch between them:
+**The story**, **The deck**, and **Just the cards** — that last one is the
+forty cards and nothing else, no heading, which is the picture that looks like
+a deck laid out on a mat. **Copy image** puts whichever you are looking at on
+the clipboard so you can paste it straight into the group chat, **Download**
+saves the PNG, and on a phone **Share** hands it to the usual share sheet.
 
 **Name the deck** in the box under the picture and the name becomes the
 headline, with the set stepping down to the line beneath it. Leave it empty
@@ -629,17 +642,43 @@ away. Tap a tag to remove it, tap a suggestion to add it, or type your own:
 else on the picture is measured; the tags are the only place you get to say
 what the deck was actually *for*.
 
-There are deliberately **no card names on it, and no seed**. A decklist tells
-whoever reads it what was in the packs, and a seed hands them the whole draft;
-the shape tells them what you *built*, which is the interesting part and the
-part a picture is good at — nobody reads a forty-card list in a group chat.
-Build the deck first: before that the picture is your picks so far, and says
-so. Sealed has no picture, for the same reason it has no draft story — there
-were no picks to remember.
+The story picture deliberately has **no card names on it, and no seed**. A
+decklist tells whoever reads it what was in the packs, and a seed hands them
+the whole draft; the shape tells them what you *built*, which is the
+interesting part and the part a picture is good at. The two deck pictures do
+name every card, which is the point of them — send the story one to the people
+you are about to draft against, and the deck one to everybody else. Build the
+deck first either way: before that the story picture is your picks so far, and
+says so. Sealed has no story picture, for the same reason it has no draft
+story — there were no picks to remember — but it has both deck pictures.
 
 The colour split counts your spells, not the whole deck. Counting the lands
 made every deck come out about 43% colourless, which is true, useless, and
 looks like it means something.
+
+**The pack is across the top and my deck is underneath — can I have the old
+layout back?** Yes. **Layout** in the bar above the pack switches between
+them, and it remembers which you chose. *Table* is the new default on a
+desktop: the pack in two rows across the top, your deck in curve columns
+underneath, which is how Arena and Draftmancer both lay a draft out and the
+reason is the same in both — the curve is what you consult to make the next
+pick, and in a 340px sidebar you can see about three columns of it. *Sidebar*
+is the old one, with the deck beside the pack; it is better on a short screen,
+where two rows of cards plus a deck is more than fits. On a phone neither
+applies — there you get the rail, which is a better answer to the same problem
+on a 390px screen.
+
+**Can I sort the other way round?** The arrow next to the sort box flips it:
+mana value high to low, name Z to A, worst card first if that is what you
+want. It turns the columns round as well, so a curve can be read downwards.
+Lands stay on the end either way — they are not part of the curve.
+
+**Can I move the columns themselves?** Drag a column by its heading and drop
+it where you want it; the arrow keys do the same if it has focus. Dragging a
+*card* still moves that card between columns, which is why the heading is the
+handle for the column. Once you have arranged them by hand the app stops
+having opinions about the order, and a **Reset columns** button appears to
+give them back.
 
 **Where do I get a cube?** The cube tab opens on **Find a cube**. The official
 cubes — Vintage, Legacy, Modern, Arena and the rest of the ones Wizards runs —

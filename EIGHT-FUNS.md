@@ -233,6 +233,35 @@ remembers the table's usual settings, greets returning names, maybe a
   the same move without a pointer. Measured end to end: reorder, then start —
   the draft opens the pack that is now first. Verdict at next draft night.
 
+- [x] Flow / Expression: **the desktop layout, and the deck as a picture** —
+  2026-11-24. Four things, from three references he brought: LSV on
+  Draftmancer, somebody's Arena sealed pool, and Archidekt's deck image.
+  **The draft screen now lays out like every client people actually draft
+  on**: the pack in two rows across the top, the deck in curve columns
+  underneath, full width. The deck panel and its piles already existed — they
+  were parked in a 340px sidebar where three columns of curve fit, which is
+  the whole problem. Nothing new had to be built to show nine. A card's size
+  is the smallest of three limits: half the pack across, the card size you
+  chose, and two rows plus the top of the deck fitting on the screen at once.
+  That last one is measured rather than guessed, because the header wraps on
+  a narrower window and a constant was then wrong by exactly one header. The
+  row is pinned to half a pack as well — capping the card alone let a ninth
+  card join the first row as soon as the height limit made them narrow, and a
+  ten-card pack came out as eight and two. **Layout** switches back to the
+  sidebar and remembers; the phone rail is untouched, and below 1050px none
+  of it applies. **Columns can be dragged by their heads**, the same gesture
+  as the pack reels and for the same reason — curve order is a good default
+  and not a decision. A hand-made order wins over everything else, and says
+  so by offering a reset. **The sort runs both ways** now: the arrow next to
+  the sort box flips the cards and the columns together, with lands pinned to
+  the end because they are not part of the curve. And **the deck has its own
+  picture**, in two styles: the deck under a heading with its curve, colours
+  and counts, and the forty cards on their own. Both read the columns you
+  arranged, including any you moved. The share picture is unchanged and still
+  names no card — it is the one you send to people you are about to draft
+  against. Sealed gets the deck pictures although it has no story.
+  Verdict at next draft night.
+
 - [x] Flow: **era first, then set** — 2026-08-14. The setup screen was one
   long configuration form; it now asks the question this app exists to ask.
   Step one is a shelf of six era cards, each with its years, a line about
