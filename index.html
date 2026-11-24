@@ -158,6 +158,28 @@
   .tab.on{background:var(--stripes); border-color:var(--gold); color:var(--accent-ink); font-weight:700}
 
   .setup{max-width:860px; margin:30px auto}
+  /* Start stays where it can be pressed.
+   *
+   * Between the reels and the start button sit four settings almost nobody
+   * changes — who opens what, how far the chaos spreads, the seed, the
+   * format — and on a 900px screen they pushed Start off the bottom. You
+   * rolled, which is the fun part, and then scrolled past four things you
+   * had not touched to find the button. Sticky rather than moved, so the
+   * reading order is still "choose, then start" for the people who do
+   * change them. The fade is so the content scrolling underneath does not
+   * appear to run into the button.
+   *
+   * Desktop only, and not for want of trying: on a phone the row wraps to
+   * two lines, which is tall enough to cover the roll button it is supposed
+   * to be helping you reach, and it lands on top of the jump-to-the-ends
+   * buttons. A phone already has an answer to "the button is a long way
+   * down", and it is those buttons. */
+  @media(min-width:1051px){
+    .startbar{position:sticky; bottom:0; z-index:40; margin-top:14px;
+              padding:14px 0 6px;
+              background:linear-gradient(to top, var(--panel) 68%, transparent)}
+    .startbar > .btn{margin-top:0}
+  }
   .card-panel{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:24px}
   .field{margin-bottom:18px}
   .field label{display:block; font-size:12px; text-transform:uppercase; letter-spacing:.9px; color:var(--ink2); margin-bottom:7px}
@@ -1353,7 +1375,9 @@
           </details>
           <input type="checkbox" id="bonusToggle" checked class="sr-only" aria-hidden="true">
           <div id="setNote" class="note hidden"></div>
-          <button id="btnStart" class="btn primary" style="width:100%;margin-top:8px" disabled>Select a set to begin</button>
+          <div class="startbar">
+            <button id="btnStart" class="btn primary" style="width:100%" disabled>Select a set to begin</button>
+          </div>
           </div>
         </div>
       </div>
@@ -1422,7 +1446,7 @@
           </div>
         </div>
         <div id="chaosPreview" class="note hidden"></div>
-        <div class="row" style="margin-top:8px">
+        <div class="row startbar">
           <button id="btnChaosPeek" class="btn" style="flex:0 0 auto"
                   aria-expanded="false" aria-controls="chaosTable">Show the table</button>
           <button id="btnChaosStart" class="btn primary" style="flex:1">Start the draft</button>
@@ -1534,7 +1558,9 @@
           </div>
         </div>
         <div id="cubeReq" class="hint" style="margin-bottom:12px"></div>
-        <button id="btnCubeStart" class="btn primary" style="width:100%" disabled>Resolve a cube first</button>
+        <div class="startbar">
+          <button id="btnCubeStart" class="btn primary" style="width:100%" disabled>Resolve a cube first</button>
+        </div>
       </div>
     </div>
   </section>
@@ -6507,6 +6533,7 @@ function show(id){
   if (id === 'viewSetup') renderGreeting(true);
 }
 
+
 var ERAS = [
   { id:'all', label:'All',        from:'1900', to:'2999' },
   { id:'e1',  label:'1993–1999',  from:'1900', to:'1999-12-31' },
@@ -10916,8 +10943,19 @@ function renderBuild(){
   $('bSide').textContent = sideboard.length;
   var tb = $('bTotal');
   tb.textContent = total;
-  tb.className = 'count-badge ' + (total === S.deckTarget ? 'ok' : 'off');
+  var ready = total === S.deckTarget;
+  tb.className = 'count-badge ' + (ready ? 'ok' : 'off');
   showStoryButtons(!!S.story);
+
+  /* Which of the six buttons is the one to press.
+   *
+   * Arriving here the deck is every card you drafted — 45 spells and no
+   * lands — so the move is Auto-build. Once it is the right size the move
+   * is the picture. Neither of them fires on its own: deciding what the
+   * deck actually is remains the entire game, and the same count the badge
+   * turns green on is the one that moves the emphasis. */
+  $('btnAuto').classList.toggle('primary', !ready);
+  $('btnDeckImg').classList.toggle('primary', ready);
 
   renderLandPanel(spells, landTotal);
 

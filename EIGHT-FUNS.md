@@ -284,6 +284,30 @@ remembers the table's usual settings, greets returning names, maybe a
   had been costing three cards off the end of the row. KEPT so far: the
   measured height budget, and the growth as the pack empties.
 
+- [x] Flow: **launch to deck image, walked end to end** — 2026-11-24.
+  His goal in his words: "a nice flow through from launch to deck image".
+  Walking it turned up four snags; two are fixed and two are deliberately
+  not. **Start stays on screen**: between the reels and the start button sit
+  four settings almost nobody changes, and on a 900px window they pushed
+  Start to y=976 — you rolled, which is the fun part, then scrolled past
+  four things you had not touched to find the button. It is sticky now, so
+  the reading order is unchanged for the people who do change them. Desktop
+  only: on a phone the row wraps to two lines, tall enough to cover the roll
+  button it is meant to help you reach, and it lands on the jump-to-the-ends
+  buttons, which are already the phone's answer to this. **The next move
+  looks like the next move**: you arrive at the deckbuilder with 45 spells
+  and no lands, so Auto-build is the primary button until the deck is the
+  right size, and the Deck image is primary once it is. It reuses the same
+  count the Total badge turns green on, so there is only one definition of
+  done.
+  **CUT — the story modal stops opening by itself.** It is the celebration
+  and it costs one click. A draft that ends by dumping you in a spreadsheet
+  is a worse draft.
+  **CUT — auto-build on arrival.** It would be the shortest path to a deck
+  image and it would hand away the deckbuilding, which is the game. Same
+  mistake as the table reveal: a thing that saves you from the part you came
+  for. The button is one press away and now it is the lit one.
+
 - [x] Flow: **era first, then set** — 2026-08-14. The setup screen was one
   long configuration form; it now asks the question this app exists to ask.
   Step one is a shelf of six era cards, each with its years, a line about
