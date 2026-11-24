@@ -271,6 +271,18 @@ remembers the table's usual settings, greets returning names, maybe a
   words: "it should be condensing to one row and more viewable as the cards
   are picked", which was right and which the first version had quietly
   legislated against.
+  *And again, an hour later, because that was still the wrong objective:*
+  "It is much easier to compare cards that are side by side and not top to
+  bottom. Side by side should be prioritized, the top row should be
+  prioritized." Both earlier versions optimised for card SIZE, and the way to
+  make cards big is to split the pack evenly — which is exactly the layout
+  that makes comparing them hard. The rule is now: one row if the pack fits
+  in one at all, otherwise fill the top row and wrap the remainder. Size is
+  only a floor (never smaller than the XS the Cards control offers) and a
+  ceiling (never larger than half again what you chose). The draft screen
+  also broke out of the app's 1560px reading width, which on a 1920 screen
+  had been costing three cards off the end of the row. KEPT so far: the
+  measured height budget, and the growth as the pack empties.
 
 - [x] Flow: **era first, then set** — 2026-08-14. The setup screen was one
   long configuration form; it now asks the question this app exists to ask.

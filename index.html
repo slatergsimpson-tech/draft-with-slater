@@ -131,6 +131,14 @@
   #btnHdrTools{display:none}
   .wrap{max-width:1560px; margin:0 auto;
         padding:22px calc(20px + var(--safe-r)) calc(80px + var(--safe-b)) calc(20px + var(--safe-l))}
+  /* 1560px is a reading width, and it is the right cap for every screen in
+     this app except one. A pack laid out side by side wants every pixel the
+     window has: on a 1920 screen the cap was costing three cards off the end
+     of the row, which is three cards you then had to look down to find. Only
+     while the draft screen is up, and only in the table layout — see
+     applyPackWidth. Still capped, because a row of cards 2.5 metres wide is
+     not side by side either, it is a panorama. */
+  body.packwide .wrap{max-width:2400px}
 
   .sharebox{max-width:1560px; margin:0 auto; padding:10px 20px 0}
   .sharebox input{width:100%; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px}
@@ -6482,10 +6490,18 @@ document.addEventListener('keydown', function(e){
   el.click();
 });
 
+/* The draft screen in the table layout is the one screen that is allowed out
+ * of the app's reading width. */
+function applyPackWidth(){
+  var draft = !$('viewDraft').classList.contains('hidden');
+  document.body.classList.toggle('packwide', draft && S.draftLayout === 'table');
+}
+
 function show(id){
   ['viewSetup','viewLoading','viewDraft','viewBuild','viewPlay'].forEach(function(v){
     $(v).classList.toggle('hidden', v !== id);
   });
+  applyPackWidth();
   // Leaving the loading screen for any reason stops its flavour rotating.
   if (id !== 'viewLoading') stopFlavour();
   if (id === 'viewSetup') renderGreeting(true);
@@ -9365,27 +9381,33 @@ function flyToPool(el){
 var PACK_PEEK = 250;
 var PACK_GAP = 10;                        // must match the gap in the CSS
 
-/* How many rows to deal the pack into.
+/* How to deal the pack out.
  *
- * Two rows was the ask and two rows is right for a fresh pack: fifteen cards
- * in one line are postage stamps. But it was written as a rule rather than as
- * a decision, so a pack with six cards left still came out as three and
- * three, at exactly the size it had been at fifteen — the cards never got
- * easier to read as the pack emptied, which is the opposite of what
- * happens on a real table.
+ * Two cards in the same row can be compared at a glance. Two in different
+ * rows cannot — your eye has to leave one to find the other, and by the time
+ * it arrives you are comparing a card with a memory of a card. Everything
+ * here follows from that:
  *
- * So: work out how big a card would be either way and take the bigger. One
- * row and two rows trade the same budget in opposite directions — one row
- * gives each card the full height but a fifteenth of the width, two rows
- * halve the height and double the width — and which wins depends on the
- * pack, the window and the card size, which is three things too many to
- * guess at. A tie goes to fewer rows, because a pack you can read in one
- * line is easier than one you have to read in two.
+ *   1. One row if the pack fits in one row at all.
+ *   2. Failing that, fill the top row and wrap the remainder under it.
  *
- * The ceiling is half again the card size you chose, not the size itself.
- * The old ceiling meant the last few cards of a pack could never grow, which
- * was the complaint; letting them grow without any ceiling at all means a
- * single remaining card half a metre wide on a tall screen. */
+ * Note what is NOT a goal: the biggest possible card. Two earlier versions
+ * optimised for size — first by fixing two rows, then by picking whichever
+ * row count made the cards largest — and both produced an even split,
+ * because an even split is what makes cards big. Eight and seven at 154px
+ * beats twelve and three at 107px on every measure except the one that
+ * matters, which is how many cards you can hold in your eye at once. Size is
+ * now only a floor and a ceiling.
+ *
+ * The floor is the smallest card the app itself offers. Shrinking to XS to
+ * keep a pack on one row is a trade worth making; shrinking past the size
+ * the Cards control would ever give you is not — past there you are not
+ * comparing cards, you are comparing rectangles.
+ *
+ * The ceiling is half again the card size you chose, so the last few picks
+ * of a pack still grow into the space the departed cards left behind. */
+var PACK_MIN_W = 104;                     // CARD_SIZES[0].pack — the XS width
+
 function packCardCeiling(){
   var v = parseFloat(getComputedStyle(document.documentElement)
     .getPropertyValue('--card-w'));
@@ -9395,16 +9417,24 @@ function packCardCeiling(){
 function packRowPlan(n, avail, chrome){
   var ceiling = packCardCeiling();
   var budget = Math.max(140, (window.innerHeight || 800) - chrome);
-  var best = null;
-  for (var rows = 1; rows <= 2; rows++){
-    var cols = Math.max(1, Math.ceil(n / rows));
-    var w = Math.min(ceiling,
-                     (avail - (cols - 1) * PACK_GAP) / cols,
-                     budget / rows * 0.7176);
-    // Half a pixel of slack, so a dead heat counts as one and takes one row.
-    if (!best || w > best.w + 0.5) best = { rows: rows, cols: cols, w: w };
+  var byWidth = function(cols){ return (avail - (cols - 1) * PACK_GAP) / cols; };
+  var byHeight = function(rows){ return (budget - (rows - 1) * PACK_GAP) / rows * 0.7176; };
+
+  /* One row, whenever the whole pack will go across it without the cards
+   * dropping below the floor. On a wide screen this is a fifteen-card pack
+   * from the first pick to the last. */
+  var one = byWidth(n);
+  if (n < 2 || one >= PACK_MIN_W) {
+    return { rows: 1, cols: n, w: Math.min(ceiling, one, byHeight(1)) };
   }
-  return best;
+
+  /* Otherwise: as many as the row will take, and the rest underneath. The
+   * top row is the one that gets filled, because that is the row the pack
+   * is read from and the row most comparisons happen in. */
+  var cols = Math.max(1, Math.floor((avail + PACK_GAP) / (PACK_MIN_W + PACK_GAP)));
+  if (cols > n) cols = n;
+  var rows = Math.ceil(n / cols);
+  return { rows: rows, cols: cols, w: Math.min(ceiling, byWidth(cols), byHeight(rows)) };
 }
 
 /* Apply the plan from whatever measurements are in hand. Called twice: once
@@ -10205,6 +10235,7 @@ var LAYOUT_KEY = 'draft:layout';
 function applyDraftLayout(){
   var table = S.draftLayout === 'table';
   $('draftGrid').classList.toggle('tabletop', table);
+  applyPackWidth();
   var b = $('btnLayout');
   b.textContent = 'Layout: ' + (table ? 'table' : 'sidebar');
   b.setAttribute('aria-pressed', table ? 'true' : 'false');
