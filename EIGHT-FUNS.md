@@ -237,8 +237,8 @@ remembers the table's usual settings, greets returning names, maybe a
   2026-11-24. Four things, from three references he brought: LSV on
   Draftmancer, somebody's Arena sealed pool, and Archidekt's deck image.
   **The draft screen now lays out like every client people actually draft
-  on**: the pack in two rows across the top, the deck in curve columns
-  underneath, full width. The deck panel and its piles already existed — they
+  on**: the pack across the top, the deck in curve columns underneath, full
+  width. The deck panel and its piles already existed — they
   were parked in a 340px sidebar where three columns of curve fit, which is
   the whole problem. Nothing new had to be built to show nine. A card's size
   is the smallest of three limits: half the pack across, the card size you
@@ -261,6 +261,16 @@ remembers the table's usual settings, greets returning names, maybe a
   names no card — it is the one you send to people you are about to draft
   against. Sealed gets the deck pictures although it has no story.
   Verdict at next draft night.
+  *Same day, after one look at it:* two rows was written as a rule rather
+  than as a decision, so a pack with five cards left still came out as three
+  and two at exactly the size it had been at fifteen — the cards never got
+  easier to read as the pack emptied, which is the opposite of what happens
+  on a real table. It now works out how big a card would be in one row and
+  in two and takes the bigger, which collapses a short pack to one line on
+  its own and lets the cards grow up to half again the size you chose. His
+  words: "it should be condensing to one row and more viewable as the cards
+  are picked", which was right and which the first version had quietly
+  legislated against.
 
 - [x] Flow: **era first, then set** — 2026-08-14. The setup screen was one
   long configuration form; it now asks the question this app exists to ask.

@@ -659,10 +659,17 @@ looks like it means something.
 **The pack is across the top and my deck is underneath — can I have the old
 layout back?** Yes. **Layout** in the bar above the pack switches between
 them, and it remembers which you chose. *Table* is the new default on a
-desktop: the pack in two rows across the top, your deck in curve columns
-underneath, which is how Arena and Draftmancer both lay a draft out and the
-reason is the same in both — the curve is what you consult to make the next
-pick, and in a 340px sidebar you can see about three columns of it. *Sidebar*
+desktop: the pack across the top, your deck in curve columns underneath,
+which is how Arena and Draftmancer both lay a draft out and the reason is the
+same in both — the curve is what you consult to make the next pick, and in a
+340px sidebar you can see about three columns of it.
+
+A fresh fifteen-card pack deals into two rows, because fifteen cards in one
+line are postage stamps. The cards then grow as the pack empties, and once
+there are few enough that one line is the better read it drops to one line —
+the last few picks of a pack are nearly twice the size of the first few. It
+works this out each pick from the window and the card size rather than
+following a rule, so the cards are always as large as the room allows. *Sidebar*
 is the old one, with the deck beside the pack; it is better on a short screen,
 where two rows of cards plus a deck is more than fits. On a phone neither
 applies — there you get the rail, which is a better answer to the same problem
