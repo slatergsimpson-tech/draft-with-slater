@@ -283,6 +283,32 @@ remembers the table's usual settings, greets returning names, maybe a
   also broke out of the app's 1560px reading width, which on a 1920 screen
   had been costing three cards off the end of the row. KEPT so far: the
   measured height budget, and the growth as the pack empties.
+  *And a third time, which was the one that found the actual bug:* "why is
+  the entire pack crammed into the top row? The cards are too small to read
+  now, and the card size adjustment is not changing anything for me." It was
+  not changing anything because it could not: --card-w entered the layout
+  only as a ceiling of 1.5x that a full pack never reached, so the size was
+  worked out from a constant (the XS width) and the window. The Cards
+  control was inert on this screen by construction, and that same constant
+  is what put fifteen cards in one row. The chosen size now comes first and
+  the layout follows from it — as many as fit at that size, top row filled,
+  remainder wrapped, cards stretching to fill the row exactly, which is what
+  the pack grid did for years via auto-fill and minmax before any of this.
+  Measured at 1920x1040, a 15-card pack: XS one row of 15 at 116px, S 14+1
+  at 125, M 12+3 at 147, L 8+7 at 200, XL 8+7 at 224. At 1440x900 the top
+  three saturate at 8+7 and 164px, because that is the largest fifteen cards
+  can be in two rows at that width — the alternative is a third row with the
+  deck below the fold, which contradicts the two things he asked for first.
+  The width is now computed in one place instead of being duplicated between
+  the stylesheet and the script.
+  One trap found on the way, worth knowing about: the pack measures the
+  width it has, lays itself out, becomes taller, and the page gains a
+  scrollbar — which takes 15px of the width it had just measured, so the
+  last card wrapped and a two-row pack became three. It corrected itself a
+  second later, which made it look like a glitch rather than a bug. Fixed
+  with scrollbar-gutter:stable on html, so the width no longer depends on
+  whether the page happens to scroll yet. Anything in this app that lays out
+  from a measured width had that bug available to it.
 
 - [x] Flow: **launch to deck image, walked end to end** — 2026-11-24.
   His goal in his words: "a nice flow through from launch to deck image".

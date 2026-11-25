@@ -664,14 +664,21 @@ which is how Arena and Draftmancer both lay a draft out and the reason is the
 same in both — the curve is what you consult to make the next pick, and in a
 340px sidebar you can see about three columns of it.
 
-The pack goes in one row wherever one row will hold it, because two cards
-side by side can be compared at a glance and two in different rows cannot.
-On a 1920-wide screen that is a full fifteen-card pack from the first pick to
-the last, and the cards grow as the pack empties. Where the window is too
-narrow for that, the top row is filled and the remainder wraps underneath it
-— twelve and three rather than eight and seven, because the point is how many
-cards you can hold in your eye at once. The draft screen is also the one
-screen allowed out of the app's usual reading width, for the same reason. *Sidebar*
+**The Cards control in the header is the knob for this.** The size you set
+there is the size the cards are; the row then holds as many as fit at that
+size, the top row is filled first, and anything left over wraps underneath.
+So stepping down trades size for how many you can see at once and stepping
+up trades the other way: on a 1920-wide screen a fifteen-card pack is one
+row of fifteen at XS, twelve and three at M, and eight and seven at XL. The
+cards also grow as the pack empties, up to half again your size, so the last
+few picks are not the same postage stamps as the first.
+
+Two things it will not do. It will not let the pack get so tall that the deck
+falls off the bottom of the screen — so on a narrow window the largest sizes
+can land in the same place, because there is no way to put fifteen cards in
+two rows on a 1440-wide screen that is bigger than about 166px. And the draft
+screen is the one screen allowed out of the app's usual reading width, so a
+wide monitor is actually used. *Sidebar*
 is the old one, with the deck beside the pack; it is better on a short screen,
 where two rows of cards plus a deck is more than fits. On a phone neither
 applies — there you get the rail, which is a better answer to the same problem

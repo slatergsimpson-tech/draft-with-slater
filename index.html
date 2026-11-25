@@ -49,6 +49,14 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
+  /* Reserve the scrollbar whether or not the page needs one yet.
+     Without this the pack lays itself out, gets taller, the page gains a
+     scrollbar, and the 15px that takes is 15px the row was already counting
+     on — so the last card wraps and a two-row pack becomes three. The pack
+     measures, then changes the thing it measured. Anything laying out from
+     a measured width has this bug available to it, so it is closed here for
+     the whole app rather than in the one place it was noticed. */
+  html{scrollbar-gutter:stable}
   body{
     background:radial-gradient(1200px 600px at 50% -10%, var(--bg2) 0%, transparent 60%), var(--bg);
     color:var(--ink); font-family:var(--sans); font-size:14px; line-height:1.55;
@@ -234,37 +242,23 @@
     .draftgrid.tabletop #colourBlock h3{margin:0; flex:0 0 auto; font-size:12.5px}
     .draftgrid.tabletop #colourBlock .colorbar{flex:1 1 220px; margin:0}
     .draftgrid.tabletop #colourBlock .pctrow{flex:0 0 auto; margin:0}
-    /* The pack in as few rows as it reads best in, with a short last row
-       centred under the long one. Flex rather than grid: grid cannot centre
-       a last row, and a fifteen-card pack always has one.
+    /* The pack, with a short last row centred under the full one. Flex
+       rather than grid: grid cannot centre a last row, and a fifteen-card
+       pack usually has one.
      *
-     * A card's size is three limits, whichever bites first: a row of them
-     * has to fit across, a column of rows has to fit down the screen above
-     * the deck, and it must not grow past half again the card size you
-     * chose. That middle one is what makes this layout worth having —
-     * without it a 900px-tall laptop put the deck below the fold, which is
-     * the thing it exists to prevent. 0.7176 is a card's width over its
-     * height.
-     *
-     * Then the ROW is pinned to exactly --packcols cards, rather than left
-     * to wrap wherever it likes. Capping the card alone was not enough: the
-     * height limit makes cards narrow, narrow cards leave room, and a
-     * ten-card pack came out as eight and two.
-     *
-     * All three of --pack-avail, --pack-rows and --packcols are worked out
-     * in JS. The width cannot be read off this element without the
-     * element's own width depending on it, and the row count is a choice
-     * between two measured outcomes rather than a formula. */
+     * --cw and --packcols are both worked out in packRowPlan and set from
+     * there; see the note above it for why the size is decided in script
+     * rather than here. The row is pinned to exactly --packcols cards wide
+     * rather than left to wrap where it likes, so the top row is full and
+     * the remainder goes underneath — letting flex choose would put the
+     * wrap wherever the last card happened to fall short. */
     .draftgrid.tabletop .packgrid.packfit{
-      --cw:max(96px, min(calc(var(--card-w) * 1.5),
-              calc((var(--pack-avail, 1200px) - (var(--packcols, 8) - 1) * 10px) / var(--packcols, 8)),
-              calc((100vh - var(--pack-chrome, 430px)) / var(--pack-rows, 2) * 0.7176)));
       display:flex; flex-wrap:wrap; justify-content:center; gap:10px;
       margin:0 auto 12px;
-      width:calc(var(--packcols, 8) * var(--cw) + (var(--packcols, 8) - 1) * 10px);
+      width:calc(var(--packcols, 8) * var(--cw, 150px) + (var(--packcols, 8) - 1) * 10px);
       max-width:100%;
     }
-    .draftgrid.tabletop .packgrid.packfit .mtgcard{flex:0 0 auto; width:var(--cw)}
+    .draftgrid.tabletop .packgrid.packfit .mtgcard{flex:0 0 auto; width:var(--cw, 150px)}
     /* Full width is the entire point: nine columns of curve rather than the
        three that fit beside the pack. */
     .draftgrid.tabletop .piles{padding-bottom:10px}
@@ -9405,80 +9399,111 @@ function flyToPool(el){
  * panel's own head, and enough of the first pile to read a card's title. Any
  * less and the deck is below the fold, which is the thing this layout was
  * built to stop. */
-var PACK_PEEK = 250;
+/* Enough of the deck to be worth having on screen: the colour strip, the
+ * panel's own head, the column headings and the top of the first card. It
+ * was 250, which bought a sliver more of the piles at the cost of a whole
+ * card size off the pack — the wrong way round, since the pack is the thing
+ * you are looking at while you pick. */
+var PACK_PEEK = 190;
 var PACK_GAP = 10;                        // must match the gap in the CSS
+
+/* The table layout is a desktop layout: below this the stylesheet ignores
+ * every variable set here, and a phone is on the rail. Must match the
+ * media query the layout lives in. */
+function packFitActive(){
+  return S.draftLayout === 'table' && (window.innerWidth || 0) >= 1051;
+}
 
 /* How to deal the pack out.
  *
- * Two cards in the same row can be compared at a glance. Two in different
- * rows cannot — your eye has to leave one to find the other, and by the time
- * it arrives you are comparing a card with a memory of a card. Everything
- * here follows from that:
+ * The size you set with the Cards control is the size the cards are. That
+ * reads as too obvious to write down, and it is exactly what the last two
+ * versions got wrong: both worked the size out for themselves from the pack
+ * and the window, and your choice entered only as a ceiling they never
+ * reached. The control did nothing whatever on this screen. Worse, the size
+ * they worked out was the smallest the app offers, which is how a fifteen
+ * card pack ended up as one row of unreadable thumbnails.
  *
- *   1. One row if the pack fits in one row at all.
- *   2. Failing that, fill the top row and wrap the remainder under it.
+ * So the chosen size comes first and everything else follows from it: as
+ * many cards as fit across the row at that size, the rest wrapped
+ * underneath, the top row filled first because that is the row the pack is
+ * read from. Cards then stretch to fill the row exactly, so it is never
+ * short of the right-hand edge — which is what the pack grid did for years
+ * before the table layout existed, by way of auto-fill and minmax.
  *
- * Note what is NOT a goal: the biggest possible card. Two earlier versions
- * optimised for size — first by fixing two rows, then by picking whichever
- * row count made the cards largest — and both produced an even split,
- * because an even split is what makes cards big. Eight and seven at 154px
- * beats twelve and three at 107px on every measure except the one that
- * matters, which is how many cards you can hold in your eye at once. Size is
- * now only a floor and a ceiling.
+ * Two bounds survive, and only two.
  *
- * The floor is the smallest card the app itself offers. Shrinking to XS to
- * keep a pack on one row is a trade worth making; shrinking past the size
- * the Cards control would ever give you is not — past there you are not
- * comparing cards, you are comparing rectangles.
+ * Cards may grow to half again your size once the pack has emptied enough
+ * to leave the room, so the last picks are not the same postage stamps as
+ * the first.
  *
- * The ceiling is half again the card size you chose, so the last few picks
- * of a pack still grow into the space the departed cards left behind. */
-var PACK_MIN_W = 104;                     // CARD_SIZES[0].pack — the XS width
-
-function packCardCeiling(){
+ * And if the pack at your size would be too tall to leave the deck on
+ * screen beneath it, the size steps down until it is not. On a wide screen
+ * that never happens. On a narrow one it happens before the largest sizes
+ * do, so L and XL can land in the same place: there is no way to arrange
+ * fifteen cards in two rows on a 1440px screen that is bigger than about
+ * 166px, and the alternative to admitting that is pushing the deck off the
+ * bottom. Narrower still and the pack takes a third row rather than shrink
+ * to nothing.
+ *
+ * The width is settled here rather than in the stylesheet. It used to be
+ * computed in both, from the same inputs in two notations, which is a bug
+ * with a date on it. */
+function packCardBase(){
   var v = parseFloat(getComputedStyle(document.documentElement)
     .getPropertyValue('--card-w'));
-  return (v || 182) * 1.5;
+  return v || 182;
 }
 
 function packRowPlan(n, avail, chrome){
-  var ceiling = packCardCeiling();
-  var budget = Math.max(140, (window.innerHeight || 800) - chrome);
-  var byWidth = function(cols){ return (avail - (cols - 1) * PACK_GAP) / cols; };
-  var byHeight = function(rows){ return (budget - (rows - 1) * PACK_GAP) / rows * 0.7176; };
+  var base = packCardBase();
+  var budget = Math.max(160, (window.innerHeight || 800) - chrome);
+  var colsAt = function(w){
+    return Math.max(1, Math.min(n, Math.floor((avail + PACK_GAP) / (w + PACK_GAP))));
+  };
+  var tallAt = function(w, rows){
+    return rows * (w / 0.7176) + (rows - 1) * PACK_GAP;
+  };
 
-  /* One row, whenever the whole pack will go across it without the cards
-   * dropping below the floor. On a wide screen this is a fifteen-card pack
-   * from the first pick to the last. */
-  var one = byWidth(n);
-  if (n < 2 || one >= PACK_MIN_W) {
-    return { rows: 1, cols: n, w: Math.min(ceiling, one, byHeight(1)) };
+  var w = base, cols = colsAt(w), rows = Math.ceil(n / cols);
+  /* Too tall for the deck to survive underneath: smaller cards, which puts
+   * more of them in each row and so needs fewer rows. Converges in a few
+   * turns; the counter is there so that no window size can spin it. */
+  var guard = 0;
+  while (tallAt(w, rows) > budget && w > 72 && guard++ < 40) {
+    w *= 0.94;
+    cols = colsAt(w);
+    rows = Math.ceil(n / cols);
   }
 
-  /* Otherwise: as many as the row will take, and the rest underneath. The
-   * top row is the one that gets filled, because that is the row the pack
-   * is read from and the row most comparisons happen in. */
-  var cols = Math.max(1, Math.floor((avail + PACK_GAP) / (PACK_MIN_W + PACK_GAP)));
-  if (cols > n) cols = n;
-  var rows = Math.ceil(n / cols);
-  return { rows: rows, cols: cols, w: Math.min(ceiling, byWidth(cols), byHeight(rows)) };
+  /* Fill the row exactly, and let a half-emptied pack grow into the space
+   * the cards that have gone left behind. Both of these can only make the
+   * card wider than the size solved above, never narrower. */
+  return {
+    rows: rows, cols: cols,
+    w: Math.min(base * 1.5,
+                (avail - (cols - 1) * PACK_GAP) / cols,
+                (budget - (rows - 1) * PACK_GAP) / rows * 0.7176)
+  };
 }
 
 /* Apply the plan from whatever measurements are in hand. Called twice: once
  * immediately off the last pack's measurements, so the cards never visibly
  * re-deal themselves, and once after layout with fresh ones. */
 function applyPackPlan(grid, n){
-  if (S.draftLayout !== 'table' || !n) return;
+  if (!packFitActive() || !n) return;
   var plan = packRowPlan(n, grid.__packAvail || 1200, grid.__packChrome || 430);
   grid.style.setProperty('--packcols', String(plan.cols));
-  grid.style.setProperty('--pack-rows', String(plan.rows));
+  grid.style.setProperty('--cw', Math.floor(plan.w) + 'px');
 }
 
 function measurePackChrome(grid){
-  if (S.draftLayout !== 'table') return;
+  if (!packFitActive()) return;
   var n = grid.__packN || 0;
+  var passes = 0;
   var take = function(){
     if (!grid.isConnected) return;
+    var was = grid.__packAvail + '|' + grid.__packChrome;
     /* Distance from the top of the document, which is what the cards have
      * above them — and which does not move when they shrink, so this cannot
      * chase its own tail. */
@@ -9487,16 +9512,23 @@ function measurePackChrome(grid){
      * so the pack takes it back rather than sitting above a blank half. */
     var peek = $('draftPanelSlot').classList.contains('hidden') ? 56 : PACK_PEEK;
     grid.__packChrome = Math.round(top + peek);
-    grid.style.setProperty('--pack-chrome', grid.__packChrome + 'px');
     /* The room a row has. Read off the column rather than the row itself,
      * because the row is about to be given a width of its own and would
      * otherwise be measuring its own answer. */
     var box = grid.parentNode;
     if (box && box.clientWidth) {
       grid.__packAvail = Math.floor(box.clientWidth);
-      grid.style.setProperty('--pack-avail', grid.__packAvail + 'px');
     }
     applyPackPlan(grid, n);
+    /* Laying the pack out can add or remove the page's own scrollbar, and
+     * that changes the width the row has to play with by about 15px — which
+     * is enough to change how many cards fit in it. So keep measuring until
+     * two passes agree. Stepping the card size quickly used to land on the
+     * stale answer and deal L into three rows while XL got two, which is
+     * the sort of thing you see once and cannot unsee. */
+    if ((grid.__packAvail + '|' + grid.__packChrome) !== was && passes++ < 3) {
+      requestAnimationFrame(take);
+    }
   };
   take();                                   // right now, from a forced layout
   requestAnimationFrame(take);              // and again once it has settled

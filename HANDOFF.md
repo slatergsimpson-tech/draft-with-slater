@@ -130,6 +130,11 @@ const h=fs.readFileSync('index.html','utf8');
   says so deliberately.
 - Re-adding a CSS class that is already present **replays no animation**. Clear
   it first or the second run is silent. This caused a real bug in the roll.
+- **Measuring a width, then laying out something that changes that width, is
+  a loop.** The pack read its available width, grew taller, the page gained a
+  scrollbar, and the 15px it took made the last card wrap — one second later
+  a second measurement put it right, so it read as a glitch. `html{scrollbar-
+  gutter:stable}` is why that cannot happen now. Keep it.
 
 ---
 
